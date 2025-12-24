@@ -1,8 +1,10 @@
 import mongoose from "mongoose";
-
-const userSchema = new mongoose.Schema(
+import bcrypt from "bcrypt";
+import jwt from "jsonwebtoken";
+import { IUserDocument } from "../utils/types";
+const userSchema = new mongoose.Schema<IUserDocument>(
   {
-    email: {
+    emailId: {
       type: String,
       required: true,
       unique: true,
@@ -15,6 +17,7 @@ const userSchema = new mongoose.Schema(
     },
     password: {
       type: String,
+      select: false,
     },
     avatarUrl: {
       type: String,
@@ -29,6 +32,26 @@ const userSchema = new mongoose.Schema(
     timestamps: true,
   }
 );
+
+userSchema.methods.getJWT = async function () {
+  const user = this;
+  const token = await jwt.sign({ _id: user._id }, process.env.JWT_SECRET!, {
+    expiresIn: "7d",
+  });
+  return token;
+};
+
+userSchema.methods.validatePassword = async function (
+  passwordInputbyUser: string
+) {
+  const user = this;
+  const passwordHash = user.password;
+  const isPasswordValid = await bcrypt.compare(
+    passwordInputbyUser,
+    passwordHash
+  );
+  return isPasswordValid;
+};
 
 const User = mongoose.model("User", userSchema);
 export default User;
