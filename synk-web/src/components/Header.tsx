@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 const Header = () => {
   return (
@@ -35,12 +36,16 @@ const Header = () => {
         </nav>
 
         <div className="flex items-center gap-4">
-          <Button variant="ghost" className="text-sm">
-            Log in
-          </Button>
-          <Button className="bg-primary text-primary-foreground hover:bg-primary/90 text-sm">
-            Get started free
-          </Button>
+          <Link href="/login">
+            <Button variant="ghost" className="text-sm">
+              Log in
+            </Button>
+          </Link>
+          <Link href="/signup">
+            <Button className="bg-primary text-primary-foreground hover:bg-primary/90 text-sm">
+              Get started free
+            </Button>
+          </Link>
         </div>
       </div>
     </header>

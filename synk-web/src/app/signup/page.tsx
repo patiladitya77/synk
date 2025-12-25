@@ -12,6 +12,7 @@ import {
 } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { getErrorMessage } from "@/lib/getErrorMessage";
 import axios from "axios";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
@@ -53,6 +54,8 @@ export default function Signup() {
       }
     } catch (error) {
       console.log(error);
+      const message = getErrorMessage(error);
+      showToast(message, "error");
     }
   };
 
