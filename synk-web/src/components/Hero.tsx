@@ -1,6 +1,7 @@
 "use client";
 
 import { Button } from "@/components/ui/button";
+import Link from "next/link";
 
 const Hero = () => {
   return (
@@ -22,9 +23,11 @@ const Hero = () => {
         </p>
 
         <div className="flex flex-col sm:flex-row gap-4 justify-center mb-16">
-          <Button className="bg-primary text-primary-foreground hover:bg-primary/90 h-12 px-8 text-base">
-            Start creating now
-          </Button>
+          <Link href="/signup">
+            <Button className="bg-primary text-primary-foreground hover:bg-primary/90 h-12 px-8 text-base">
+              Start creating now
+            </Button>
+          </Link>
           <Button
             variant="outline"
             className="h-12 px-8 text-base border-border hover:bg-secondary/20 bg-transparent"
