@@ -18,11 +18,22 @@ import { useState } from "react";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 
+import {
+  InputOTP,
+  InputOTPGroup,
+  InputOTPSeparator,
+  InputOTPSlot,
+} from "@/components/ui/input-otp";
+
 export default function Login() {
   const { showToast } = useGlobalToast();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
+  const [showOtp, setShowOtp] = useState(false);
+  const [otp, setOtp] = useState("");
+
   const router = useRouter();
+
   const handleLogin = async () => {
     if (!email || !password) {
       showToast("Please fill in all required fields", "error");
@@ -35,20 +46,14 @@ export default function Login() {
           emailId: email,
           password: password,
         },
-        {
-          withCredentials: true,
-        }
+        { withCredentials: true }
       );
-      if (res.status == 401) {
-        showToast("Invalid email or password", "error");
-        return;
-      }
+
       if (res.status === 200) {
         showToast("Welcome back!", "success");
         router.push("/dashboard");
       }
     } catch (error) {
-      console.log(error);
       if (axios.isAxiosError(error) && error.response?.status === 401) {
         showToast("Invalid email or password", "error");
         return;
@@ -57,61 +62,110 @@ export default function Login() {
       showToast(message, "error");
     }
   };
+
   return (
     <div className="flex justify-center mt-50">
       <Card className="w-full max-w-sm">
         <CardHeader>
-          <CardTitle>Login to your account</CardTitle>
+          <CardTitle>
+            {showOtp ? "Verify OTP" : "Login to your account"}
+          </CardTitle>
 
           <CardDescription>
-            Enter your email below to login to your account
+            {showOtp
+              ? `Enter the 6-digit OTP sent to ${email || "your email"}`
+              : "Enter your email below to login to your account"}
           </CardDescription>
-          <CardAction>
-            <Link href="/signup">
-              <Button variant="link">Sign Up</Button>
-            </Link>
-          </CardAction>
+
+          {!showOtp && (
+            <CardAction>
+              <Link href="/signup">
+                <Button variant="link">Sign Up</Button>
+              </Link>
+            </CardAction>
+          )}
         </CardHeader>
+
         <CardContent>
-          <form>
-            <div className="flex flex-col gap-6">
-              <div className="grid gap-2">
-                <Label htmlFor="email">Email</Label>
-                <Input
-                  id="email"
-                  type="email"
-                  placeholder="John@example.com"
-                  required
-                  onChange={(e) => setEmail(e.target.value)}
-                />
-              </div>
-              <div className="grid gap-2">
-                <div className="flex items-center">
-                  <Label htmlFor="password">Password</Label>
-                  <a
-                    href="#"
-                    className="ml-auto inline-block text-sm underline-offset-4 hover:underline"
-                  >
-                    Forgot your password?
-                  </a>
+          {/* LOGIN FORM */}
+          {!showOtp && (
+            <form>
+              <div className="flex flex-col gap-6">
+                <div className="grid gap-2">
+                  <Label htmlFor="email">Email</Label>
+                  <Input
+                    id="email"
+                    type="email"
+                    placeholder="John@example.com"
+                    required
+                    onChange={(e) => setEmail(e.target.value)}
+                  />
                 </div>
-                <Input
-                  id="password"
-                  type="password"
-                  required
-                  onChange={(e) => setPassword(e.target.value)}
-                />
+
+                <div className="grid gap-2">
+                  <div className="flex items-center">
+                    <Label htmlFor="password">Password</Label>
+                    <button
+                      type="button"
+                      className="ml-auto text-sm underline hover:underline"
+                      onClick={() => setShowOtp(true)}
+                    >
+                      Forgot your password?
+                    </button>
+                  </div>
+                  <Input
+                    id="password"
+                    type="password"
+                    required
+                    onChange={(e) => setPassword(e.target.value)}
+                  />
+                </div>
               </div>
+            </form>
+          )}
+
+          {/* OTP UI */}
+          {showOtp && (
+            <div className="flex justify-center">
+              <InputOTP maxLength={6} value={otp} onChange={setOtp}>
+                <InputOTPGroup>
+                  <InputOTPSlot index={0} />
+                  <InputOTPSlot index={1} />
+                  <InputOTPSlot index={2} />
+                </InputOTPGroup>
+                <InputOTPSeparator />
+                <InputOTPGroup>
+                  <InputOTPSlot index={3} />
+                  <InputOTPSlot index={4} />
+                  <InputOTPSlot index={5} />
+                </InputOTPGroup>
+              </InputOTP>
             </div>
-          </form>
+          )}
         </CardContent>
+
         <CardFooter className="flex-col gap-2">
-          <Button type="submit" className="w-full" onClick={handleLogin}>
-            Login
-          </Button>
-          <Button variant="outline" className="w-full">
-            Login with Google
-          </Button>
+          {!showOtp ? (
+            <>
+              <Button className="w-full" onClick={handleLogin}>
+                Login
+              </Button>
+              <Button variant="outline" className="w-full">
+                Login with Google
+              </Button>
+            </>
+          ) : (
+            <>
+              <Button className="w-full">Verify OTP</Button>
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={() => setShowOtp(false)}
+              >
+                Back to Login
+              </Button>
+            </>
+          )}
         </CardFooter>
       </Card>
     </div>
