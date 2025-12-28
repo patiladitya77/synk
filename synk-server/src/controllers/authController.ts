@@ -2,6 +2,8 @@ import { Request, Response } from "express";
 import validateSignUpData from "../utils/validation";
 import bcrypt from "bcrypt";
 import User from "../models/User";
+import crypto from "crypto";
+import sendEmail from "../utils/sendEmail";
 export const signupController = async (req: Request, res: Response) => {
   try {
     const { name, emailId, password } = req.body;
@@ -56,6 +58,45 @@ export const loginController = async (req: Request, res: Response) => {
     } else {
       return res.status(401).send("invalid credentials");
     }
+  } catch (err) {
+    res.status(400).json({ message: "ERROR " + err });
+  }
+};
+
+export const forgotPasswordController = async (req: Request, res: Response) => {
+  try {
+    const { emailId } = req.body;
+
+    const user = await User.findOne({ emailId });
+    if (!user) {
+      return res.json({ message: "If the email exists, an OTP has been sent" });
+    }
+    if (user.otpAttempts ?? 0 >= 3) {
+      return res
+        .status(429)
+        .json({ message: "Too many OTP requests. Try later." });
+    }
+
+    user.otpAttempts = (user.otpAttempts ?? 0) + 1;
+
+    // Generate 6 digit OTP
+    const otp = Math.floor(100000 + Math.random() * 900000).toString();
+
+    // Hash OTP before saving
+    const hashedOtp = crypto.createHash("sha256").update(otp).digest("hex");
+
+    user.resetOtp = hashedOtp;
+    user.resetOtpExpiry = new Date(Date.now() + 10 * 60 * 1000); // 10 mins
+
+    await user.save();
+
+    await sendEmail({
+      to: user.emailId,
+      subject: "Password Reset OTP",
+      text: `Your OTP is ${otp}. It expires in 10 minutes.`,
+    });
+
+    res.json({ message: "OTP sent to email" });
   } catch (err) {
     res.status(400).json({ message: "ERROR " + err });
   }

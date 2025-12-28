@@ -25,11 +25,17 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 
+enum AuthStep {
+  LOGIN = "login",
+  FORGOT_EMAIL = "forgot_email",
+  OTP = "otp",
+}
+
 export default function Login() {
   const { showToast } = useGlobalToast();
+  const [step, setStep] = useState<AuthStep>(AuthStep.LOGIN);
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [showOtp, setShowOtp] = useState(false);
   const [otp, setOtp] = useState("");
 
   const router = useRouter();
@@ -68,16 +74,20 @@ export default function Login() {
       <Card className="w-full max-w-sm">
         <CardHeader>
           <CardTitle>
-            {showOtp ? "Verify OTP" : "Login to your account"}
+            {step === AuthStep.LOGIN && "Login to your account"}
+            {step === AuthStep.FORGOT_EMAIL && "Forgot Password"}
+            {step === AuthStep.OTP && "Verify OTP"}
           </CardTitle>
 
           <CardDescription>
-            {showOtp
-              ? `Enter the 6-digit OTP sent to ${email || "your email"}`
-              : "Enter your email below to login to your account"}
+            {step === AuthStep.LOGIN &&
+              "Enter your email below to login to your account"}
+            {step === AuthStep.FORGOT_EMAIL &&
+              "Enter your email to receive OTP"}
+            {step === AuthStep.OTP && `Enter the 6-digit OTP sent to ${email}`}
           </CardDescription>
 
-          {!showOtp && (
+          {step === AuthStep.LOGIN && (
             <CardAction>
               <Link href="/signup">
                 <Button variant="link">Sign Up</Button>
@@ -87,36 +97,32 @@ export default function Login() {
         </CardHeader>
 
         <CardContent>
-          {/* LOGIN FORM */}
-          {!showOtp && (
+          {/* LOGIN */}
+          {step === AuthStep.LOGIN && (
             <form>
               <div className="flex flex-col gap-6">
                 <div className="grid gap-2">
-                  <Label htmlFor="email">Email</Label>
+                  <Label>Email</Label>
                   <Input
-                    id="email"
                     type="email"
                     placeholder="John@example.com"
-                    required
                     onChange={(e) => setEmail(e.target.value)}
                   />
                 </div>
 
                 <div className="grid gap-2">
                   <div className="flex items-center">
-                    <Label htmlFor="password">Password</Label>
+                    <Label>Password</Label>
                     <button
                       type="button"
-                      className="ml-auto text-sm underline hover:underline"
-                      onClick={() => setShowOtp(true)}
+                      className="ml-auto text-sm underline"
+                      onClick={() => setStep(AuthStep.FORGOT_EMAIL)}
                     >
                       Forgot your password?
                     </button>
                   </div>
                   <Input
-                    id="password"
                     type="password"
-                    required
                     onChange={(e) => setPassword(e.target.value)}
                   />
                 </div>
@@ -124,8 +130,20 @@ export default function Login() {
             </form>
           )}
 
-          {/* OTP UI */}
-          {showOtp && (
+          {/* FORGOT EMAIL */}
+          {step === AuthStep.FORGOT_EMAIL && (
+            <div className="grid gap-2">
+              <Label>Email</Label>
+              <Input
+                type="email"
+                placeholder="Enter your email"
+                onChange={(e) => setEmail(e.target.value)}
+              />
+            </div>
+          )}
+
+          {/* OTP */}
+          {step === AuthStep.OTP && (
             <div className="flex justify-center">
               <InputOTP maxLength={6} value={otp} onChange={setOtp}>
                 <InputOTPGroup>
@@ -145,7 +163,7 @@ export default function Login() {
         </CardContent>
 
         <CardFooter className="flex-col gap-2">
-          {!showOtp ? (
+          {step === AuthStep.LOGIN && (
             <>
               <Button className="w-full" onClick={handleLogin}>
                 Login
@@ -154,15 +172,32 @@ export default function Login() {
                 Login with Google
               </Button>
             </>
-          ) : (
+          )}
+
+          {step === AuthStep.FORGOT_EMAIL && (
+            <>
+              <Button className="w-full" onClick={() => setStep(AuthStep.OTP)}>
+                Send OTP
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={() => setStep(AuthStep.LOGIN)}
+              >
+                Back to Login
+              </Button>
+            </>
+          )}
+
+          {step === AuthStep.OTP && (
             <>
               <Button className="w-full">Verify OTP</Button>
               <Button
                 variant="ghost"
                 className="w-full"
-                onClick={() => setShowOtp(false)}
+                onClick={() => setStep(AuthStep.FORGOT_EMAIL)}
               >
-                Back to Login
+                Back
               </Button>
             </>
           )}

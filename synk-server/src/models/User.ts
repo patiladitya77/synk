@@ -33,6 +33,10 @@ const userSchema = new mongoose.Schema<IUserDocument>(
     resetOtpExpiry: {
       type: Date,
     },
+    otpAttempts: {
+      type: Number,
+      default: 0,
+    },
   },
   {
     timestamps: true,

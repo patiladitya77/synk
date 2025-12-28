@@ -8,6 +8,7 @@ export interface IUserDocument extends Document {
   lastLoginAt?: Date;
   resetOtp?: string;
   resetOtpExpiry?: Date;
+  otpAttempts?: number;
 
   getJWT(): string;
   validatePassword(password: string): Promise<boolean>;
