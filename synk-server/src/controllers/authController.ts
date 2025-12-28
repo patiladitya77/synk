@@ -102,6 +102,38 @@ export const forgotPasswordController = async (req: Request, res: Response) => {
   }
 };
 
+export const resetPasswordController = async (req: Request, res: Response) => {
+  try {
+    const { emailId, otp, newPassword } = req.body;
+
+    const hashedOtp = crypto
+      .createHash("sha256")
+      .update(otp.toString())
+      .digest("hex");
+
+    const user = await User.findOne({
+      emailId,
+      resetOtp: hashedOtp,
+      resetOtpExpiry: { $gt: new Date() },
+    });
+
+    if (!user) {
+      return res.status(400).json({ message: "Invalid or expired OTP" });
+    }
+
+    user.password = await bcrypt.hash(newPassword, 10);
+    user.resetOtp = undefined;
+    user.resetOtpExpiry = undefined;
+    user.otpAttempts = 0;
+
+    await user.save();
+
+    res.json({ message: "Password reset successful" });
+  } catch (err) {
+    res.status(400).json({ message: "ERROR " + err });
+  }
+};
+
 export const logoutController = async (req: Request, res: Response) => {
   res.cookie("token", null, { expires: new Date(Date.now()) });
   res.send("logout successfull");
