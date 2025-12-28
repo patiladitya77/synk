@@ -27,6 +27,12 @@ const userSchema = new mongoose.Schema<IUserDocument>(
     lastLoginAt: {
       type: Date,
     },
+    resetOtp: {
+      type: String,
+    },
+    resetOtpExpiry: {
+      type: Date,
+    },
   },
   {
     timestamps: true,
