@@ -71,7 +71,7 @@ export const forgotPasswordController = async (req: Request, res: Response) => {
     if (!user) {
       return res.json({ message: "If the email exists, an OTP has been sent" });
     }
-    if (user.otpAttempts ?? 0 >= 3) {
+    if ((user.otpAttempts ?? 0) >= 3) {
       return res
         .status(429)
         .json({ message: "Too many OTP requests. Try later." });

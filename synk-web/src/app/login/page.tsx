@@ -29,6 +29,7 @@ enum AuthStep {
   LOGIN = "login",
   FORGOT_EMAIL = "forgot_email",
   OTP = "otp",
+  SET_NEW_PASSWORD = "set_new_password",
 }
 
 export default function Login() {
@@ -37,6 +38,8 @@ export default function Login() {
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
   const [otp, setOtp] = useState("");
+  const [newPassword, setNewPassword] = useState("");
+  const [confirmPassword, setConfirmPassword] = useState("");
 
   const router = useRouter();
 
@@ -69,6 +72,75 @@ export default function Login() {
     }
   };
 
+  const handleSendOtp = async () => {
+    if (!email) {
+      showToast("Please fill in all required fields", "error");
+      return;
+    }
+    try {
+      const res = await axios.post(
+        process.env.NEXT_PUBLIC_API_BASE_URL! + "api/auth/forgotpassword",
+        {
+          emailId: email,
+        },
+        {
+          withCredentials: true,
+        }
+      );
+      if (res.status === 200) {
+        setStep(AuthStep.OTP);
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 429) {
+        showToast("Two many Requests. Try again later.", "error");
+        return;
+      }
+      const message = getErrorMessage(error);
+      showToast(message, "error");
+    }
+  };
+
+  const handleResetPassword = async () => {
+    if (!newPassword || !confirmPassword) {
+      showToast("Please fill in all required fields", "error");
+      return;
+    }
+    if (newPassword != confirmPassword) {
+      console.log("Passwords do not match");
+      showToast("Password should be match", "error");
+      return;
+    }
+    try {
+      const res = await axios.post(
+        process.env.NEXT_PUBLIC_API_BASE_URL! + "api/auth/resetpassword",
+        {
+          emailId: email,
+          newPassword: confirmPassword,
+          otp: otp,
+        },
+        {
+          withCredentials: true,
+        }
+      );
+      if (res.status === 200) {
+        showToast("Password reset successful. Please login.", "success");
+        setEmail("");
+        setPassword("");
+        setOtp("");
+        setNewPassword("");
+        setConfirmPassword("");
+        setStep(AuthStep.LOGIN);
+      }
+    } catch (error) {
+      if (axios.isAxiosError(error) && error.response?.status === 400) {
+        showToast("Invalid or expired otp", "error");
+        return;
+      }
+      const message = getErrorMessage(error);
+      showToast(message, "error");
+    }
+  };
+
   return (
     <div className="flex justify-center mt-50">
       <Card className="w-full max-w-sm">
@@ -77,6 +149,7 @@ export default function Login() {
             {step === AuthStep.LOGIN && "Login to your account"}
             {step === AuthStep.FORGOT_EMAIL && "Forgot Password"}
             {step === AuthStep.OTP && "Verify OTP"}
+            {step === AuthStep.SET_NEW_PASSWORD && "Set New Password"}
           </CardTitle>
 
           <CardDescription>
@@ -85,6 +158,8 @@ export default function Login() {
             {step === AuthStep.FORGOT_EMAIL &&
               "Enter your email to receive OTP"}
             {step === AuthStep.OTP && `Enter the 6-digit OTP sent to ${email}`}
+            {step === AuthStep.SET_NEW_PASSWORD &&
+              "Enter and confirm your new password"}
           </CardDescription>
 
           {step === AuthStep.LOGIN && (
@@ -160,6 +235,29 @@ export default function Login() {
               </InputOTP>
             </div>
           )}
+
+          {/* SET NEW PASSWORD */}
+          {step === AuthStep.SET_NEW_PASSWORD && (
+            <div className="grid gap-4">
+              <div className="grid gap-2">
+                <Label>New Password</Label>
+                <Input
+                  type="password"
+                  placeholder="Enter new password"
+                  onChange={(e) => setNewPassword(e.target.value)}
+                />
+              </div>
+
+              <div className="grid gap-2">
+                <Label>Confirm New Password</Label>
+                <Input
+                  type="password"
+                  placeholder="Confirm new password"
+                  onChange={(e) => setConfirmPassword(e.target.value)}
+                />
+              </div>
+            </div>
+          )}
         </CardContent>
 
         <CardFooter className="flex-col gap-2">
@@ -176,13 +274,17 @@ export default function Login() {
 
           {step === AuthStep.FORGOT_EMAIL && (
             <>
-              <Button className="w-full" onClick={() => setStep(AuthStep.OTP)}>
+              <Button className="w-full" onClick={handleSendOtp}>
                 Send OTP
               </Button>
               <Button
                 variant="ghost"
                 className="w-full"
-                onClick={() => setStep(AuthStep.LOGIN)}
+                onClick={() => {
+                  setPassword("");
+                  setOtp("");
+                  setStep(AuthStep.LOGIN);
+                }}
               >
                 Back to Login
               </Button>
@@ -191,11 +293,38 @@ export default function Login() {
 
           {step === AuthStep.OTP && (
             <>
-              <Button className="w-full">Verify OTP</Button>
+              <Button
+                disabled={otp.length != 6}
+                className="w-full"
+                onClick={() => {
+                  setStep(AuthStep.SET_NEW_PASSWORD);
+                }}
+              >
+                Verify OTP
+              </Button>
               <Button
                 variant="ghost"
                 className="w-full"
-                onClick={() => setStep(AuthStep.FORGOT_EMAIL)}
+                onClick={() => {
+                  setPassword("");
+                  setOtp("");
+                  setStep(AuthStep.FORGOT_EMAIL);
+                }}
+              >
+                Back
+              </Button>
+            </>
+          )}
+
+          {step === AuthStep.SET_NEW_PASSWORD && (
+            <>
+              <Button className="w-full" onClick={handleResetPassword}>
+                Reset Password
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full"
+                onClick={() => setStep(AuthStep.OTP)}
               >
                 Back
               </Button>
