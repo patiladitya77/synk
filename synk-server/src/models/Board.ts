@@ -11,6 +11,11 @@ const boardSchema = new mongoose.Schema(
       required: true,
       ref: "User",
     },
+    slug: {
+      type: String,
+      required: true,
+      index: true,
+    },
     collaborators: [
       {
         userId: {
@@ -28,11 +33,30 @@ const boardSchema = new mongoose.Schema(
       type: Boolean,
       default: false,
     },
+    inviteToken: {
+      type: String,
+    },
+    isInviteEnabled: {
+      type: Boolean,
+      default: true,
+    },
   },
   {
     timestamps: true,
   }
 );
+//Slug unique per owner
+boardSchema.index({ ownerId: 1, slug: 1 }, { unique: true });
 
+// Invite token unique ONLY when present
+boardSchema.index(
+  { inviteToken: 1 },
+  {
+    unique: true,
+    partialFilterExpression: {
+      inviteToken: { $type: "string" },
+    },
+  }
+);
 const Board = mongoose.model("Board", boardSchema);
 export default Board;
