@@ -4,6 +4,7 @@
     "paths": {
       "@types/express": ["./node_modules/@types/express"]
     },
+    "typeRoots": ["./src/types", "./node_modules/@types"],
 
     /* Projects */
     // "incremental": true,                              /* Save .tsbuildinfo files to allow for incremental compilation of projects. */

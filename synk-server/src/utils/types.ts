@@ -1,5 +1,5 @@
 import { Document } from "mongoose";
-
+import { Types } from "mongoose";
 export interface IUserDocument extends Document {
   emailId: string;
   name: string;
@@ -12,4 +12,8 @@ export interface IUserDocument extends Document {
 
   getJWT(): string;
   validatePassword(password: string): Promise<boolean>;
+}
+
+export interface JwtPayload {
+  userId: Types.ObjectId;
 }
