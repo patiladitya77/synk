@@ -17,15 +17,14 @@ export const userAuth = async (
     }
 
     //  Verify JWT
-    const decoded = jwt.verify(
+    const decoded = (await jwt.verify(
       token,
       process.env.JWT_SECRET as string
-    ) as JwtPayload;
-
-    const { userId } = decoded;
+    )) as JwtPayload;
+    const { _id } = decoded;
 
     //  Fetch user
-    const user = await User.findById(userId);
+    const user = await User.findById(_id);
     if (!user) {
       return res.status(401).json({ message: "User not found" });
     }
