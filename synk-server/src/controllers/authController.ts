@@ -4,6 +4,7 @@ import bcrypt from "bcrypt";
 import User from "../models/User";
 import crypto from "crypto";
 import sendEmail from "../utils/sendEmail";
+import AuthProvider from "../models/AuthProvider";
 export const signupController = async (req: Request, res: Response) => {
   try {
     const { name, emailId, password } = req.body;
@@ -21,6 +22,12 @@ export const signupController = async (req: Request, res: Response) => {
       password: passwordHash,
     });
     const savedUser = await user.save();
+    await AuthProvider.create({
+      userId: user._id,
+      provider: "password",
+      providerUserId: user._id.toString(),
+    });
+
     const token = await savedUser.getJWT();
 
     res.cookie("token", token, {

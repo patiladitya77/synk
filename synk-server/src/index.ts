@@ -5,6 +5,7 @@ import cors from "cors";
 dotenv.config();
 import cookieParser from "cookie-parser";
 import authRouter from "./routes/authRouter";
+import boardRouter from "./routes/boardRouter";
 const app = express();
 app.use(express.json());
 app.use(cookieParser());
@@ -17,6 +18,7 @@ app.use(
   })
 );
 app.use("/api/auth", authRouter);
+app.use("/api/board", boardRouter);
 connectDB().then(() => {
   console.log("Connection Established");
   app.listen(process.env.PORT, () => {

@@ -15,5 +15,5 @@ export interface IUserDocument extends Document {
 }
 
 export interface JwtPayload {
-  userId: Types.ObjectId;
+  _id: Types.ObjectId;
 }
