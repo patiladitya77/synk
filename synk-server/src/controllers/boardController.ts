@@ -27,3 +27,19 @@ export const createBoardController = async (req: Request, res: Response) => {
     res.status(400).json({ message: "Failed to create board-  " + err });
   }
 };
+
+export const getAllBoardsController = async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user) {
+      return res.json({ message: "User does not exist" });
+    }
+    const boards = await Board.find({
+      isArchived: false,
+      $or: [{ ownerId: user._id }, { "collaborators.userId": user._id }],
+    }).sort({ updatedAt: -1 });
+    res.json({ message: "fetched successfully", boards });
+  } catch (err) {
+    res.status(400).json({ message: "Failed to fetch board-  " + err });
+  }
+};
