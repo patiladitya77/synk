@@ -1,3 +1,4 @@
+"use client";
 import {
   Sidebar,
   SidebarHeader,
@@ -18,8 +19,25 @@ import {
 
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { BadgeCheck, Bell, LogOut, Sparkles } from "lucide-react";
+import { useRouter } from "next/navigation";
+import axios from "axios";
 
 export function AppSidebar() {
+  const router = useRouter();
+  const handleLogout = async () => {
+    try {
+      const res = await axios.post(
+        process.env.NEXT_PUBLIC_API_BASE_URL + "api/auth/logout",
+        {},
+        { withCredentials: true }
+      );
+      if (res.status == 200) {
+        router.push("/");
+      }
+    } catch (error) {
+      console.log(error);
+    }
+  };
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader />
@@ -94,7 +112,7 @@ export function AppSidebar() {
 
                 <DropdownMenuSeparator />
 
-                <DropdownMenuItem>
+                <DropdownMenuItem onClick={handleLogout}>
                   <LogOut className="mr-2 h-4 w-4" />
                   Log out
                 </DropdownMenuItem>
