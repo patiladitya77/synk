@@ -44,3 +44,20 @@ export const getAllBoardsController = async (req: Request, res: Response) => {
     res.status(400).json({ message: "Failed to fetch board-  " + err });
   }
 };
+
+export const checkName = async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    const title = (req.query.title as string).trim();
+    if (!title) return res.json({ message: "Title is empty" });
+    const exists = await Board.exists({
+      ownerId: user?._id,
+      title: title.trim(),
+    });
+    res.json({
+      available: !exists,
+    });
+  } catch (error) {
+    res.json({ message: "ERROR: " + error });
+  }
+};
