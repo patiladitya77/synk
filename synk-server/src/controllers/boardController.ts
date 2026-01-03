@@ -9,6 +9,7 @@ export const createBoardController = async (req: Request, res: Response) => {
       return res.json({ message: "User does not exist" });
     }
     const { title } = req.body;
+    if (!title) return res.json({ message: "title requried" });
     const slug = generateSlug(title);
     const board = await new Board({
       title,
