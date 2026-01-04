@@ -2,6 +2,7 @@
 import CreateCanvasCard from "@/components/CreateCanvasCard";
 import TitleDialog from "@/components/TitleDialog";
 import { useGlobalToast } from "@/components/Toast-provider";
+import UserCanvases from "@/components/UserCanvases";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -42,6 +43,7 @@ export default function Dashboard() {
         setTitle={setTitle}
         onCreate={handleCreateCanvas}
       />
+      <UserCanvases />
     </div>
   );
 }
