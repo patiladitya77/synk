@@ -24,6 +24,8 @@ import {
   InputOTPSeparator,
   InputOTPSlot,
 } from "@/components/ui/input-otp";
+import { useDispatch } from "react-redux";
+import { addUser } from "@/utils/userSlice";
 
 enum AuthStep {
   LOGIN = "login",
@@ -42,6 +44,7 @@ export default function Login() {
   const [confirmPassword, setConfirmPassword] = useState("");
 
   const router = useRouter();
+  const dispatch = useDispatch();
 
   const handleLogin = async () => {
     if (!email || !password) {
@@ -57,9 +60,11 @@ export default function Login() {
         },
         { withCredentials: true }
       );
+      console.log(res);
 
       if (res.status === 200) {
         showToast("Welcome back!", "success");
+        dispatch(addUser(res.data));
         router.push("/dashboard");
       }
     } catch (error) {

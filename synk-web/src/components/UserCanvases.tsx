@@ -19,7 +19,7 @@ const UserCanvases = () => {
   return (
     <Table className="text-base">
       <TableHeader>
-        {canvases.length === 0 && !loading && (
+        {canvases.length === 0 && !loading ? (
           <TableRow>
             <TableCell
               colSpan={4}
@@ -28,14 +28,14 @@ const UserCanvases = () => {
               No canvases yet
             </TableCell>
           </TableRow>
+        ) : (
+          <TableRow>
+            <TableHead>Name</TableHead>
+            <TableHead>Created</TableHead>
+            <TableHead>Edited</TableHead>
+            <TableHead>Author</TableHead>
+          </TableRow>
         )}
-
-        <TableRow>
-          <TableHead>Name</TableHead>
-          <TableHead>Created</TableHead>
-          <TableHead>Edited</TableHead>
-          <TableHead>Author</TableHead>
-        </TableRow>
       </TableHeader>
 
       <TableBody>
