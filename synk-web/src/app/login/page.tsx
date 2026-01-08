@@ -25,7 +25,7 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { useDispatch } from "react-redux";
-import { addUser } from "@/utils/userSlice";
+import { authenticateUser } from "@/services/authService";
 
 enum AuthStep {
   LOGIN = "login",
@@ -42,7 +42,6 @@ export default function Login() {
   const [otp, setOtp] = useState("");
   const [newPassword, setNewPassword] = useState("");
   const [confirmPassword, setConfirmPassword] = useState("");
-
   const router = useRouter();
   const dispatch = useDispatch();
 
@@ -52,21 +51,14 @@ export default function Login() {
       return;
     }
     try {
-      const res = await axios.post(
-        process.env.NEXT_PUBLIC_API_BASE_URL! + "api/auth/login",
-        {
-          emailId: email,
-          password: password,
-        },
-        { withCredentials: true }
+      await authenticateUser(
+        "login",
+        { emailId: email, password: password },
+        dispatch,
       );
-      console.log(res);
 
-      if (res.status === 200) {
-        showToast("Welcome back!", "success");
-        dispatch(addUser(res.data));
-        router.push("/dashboard");
-      }
+      showToast("Welcome back!", "success");
+      router.push("/dashboard");
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 401) {
         showToast("Invalid email or password", "error");
@@ -90,7 +82,7 @@ export default function Login() {
         },
         {
           withCredentials: true,
-        }
+        },
       );
       if (res.status === 200) {
         setStep(AuthStep.OTP);
@@ -125,7 +117,7 @@ export default function Login() {
         },
         {
           withCredentials: true,
-        }
+        },
       );
       if (res.status === 200) {
         showToast("Password reset successful. Please login.", "success");

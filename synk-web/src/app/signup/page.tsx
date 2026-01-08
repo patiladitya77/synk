@@ -13,10 +13,11 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/getErrorMessage";
-import axios from "axios";
+import { authenticateUser } from "@/services/authService";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
+import { useDispatch } from "react-redux";
 
 export default function Signup() {
   const [name, setName] = useState("");
@@ -25,6 +26,7 @@ export default function Signup() {
   const [confirmPassword, setConfirmPassword] = useState("");
   const { showToast } = useGlobalToast();
   const router = useRouter();
+  const dispatch = useDispatch();
   const handleSignup = async () => {
     if (!name || !password || !confirmPassword || !email) {
       showToast("Please fill in all required fields", "error");
@@ -36,22 +38,14 @@ export default function Signup() {
       return;
     }
     try {
-      const res = await axios.post(
-        process.env.NEXT_PUBLIC_API_BASE_URL! + "api/auth/signup",
-        {
-          name,
-          emailId: email,
-          password,
-        },
-        {
-          withCredentials: true,
-        }
+      await authenticateUser(
+        "signup",
+        { name, emailId: email, password: password },
+        dispatch,
       );
-      console.log(res.data);
-      if (res.status === 200) {
-        showToast("Account created successfully", "success");
-        router.push("/dashboard");
-      }
+
+      showToast("Account created successfully", "success");
+      router.push("/dashboard");
     } catch (error) {
       console.log(error);
       const message = getErrorMessage(error);

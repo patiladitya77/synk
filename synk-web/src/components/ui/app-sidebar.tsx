@@ -20,20 +20,16 @@ import {
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { BadgeCheck, Bell, LogOut, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
-import axios from "axios";
+import { logoutUser } from "@/services/authService";
+import { useDispatch } from "react-redux";
 
 export function AppSidebar() {
+  const dispatch = useDispatch();
   const router = useRouter();
   const handleLogout = async () => {
     try {
-      const res = await axios.post(
-        process.env.NEXT_PUBLIC_API_BASE_URL + "api/auth/logout",
-        {},
-        { withCredentials: true }
-      );
-      if (res.status == 200) {
-        router.push("/");
-      }
+      await logoutUser(dispatch);
+      router.push("/");
     } catch (error) {
       console.log(error);
     }

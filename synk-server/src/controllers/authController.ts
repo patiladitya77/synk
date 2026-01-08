@@ -61,7 +61,7 @@ export const loginController = async (req: Request, res: Response) => {
         expires: new Date(Date.now() + 8 * 3600000),
       });
 
-      res.send(user);
+      res.send({ message: "login success", savedUser: user });
     } else {
       return res.status(401).send("invalid credentials");
     }
