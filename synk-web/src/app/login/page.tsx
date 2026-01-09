@@ -25,7 +25,11 @@ import {
   InputOTPSlot,
 } from "@/components/ui/input-otp";
 import { useDispatch } from "react-redux";
-import { authenticateUser } from "@/services/authService";
+import {
+  authenticateUser,
+  resetPassword,
+  sendOtp,
+} from "@/services/authService";
 
 enum AuthStep {
   LOGIN = "login",
@@ -54,7 +58,7 @@ export default function Login() {
       await authenticateUser(
         "login",
         { emailId: email, password: password },
-        dispatch,
+        dispatch
       );
 
       showToast("Welcome back!", "success");
@@ -75,18 +79,8 @@ export default function Login() {
       return;
     }
     try {
-      const res = await axios.post(
-        process.env.NEXT_PUBLIC_API_BASE_URL! + "api/auth/forgotpassword",
-        {
-          emailId: email,
-        },
-        {
-          withCredentials: true,
-        },
-      );
-      if (res.status === 200) {
-        setStep(AuthStep.OTP);
-      }
+      await sendOtp(email);
+      setStep(AuthStep.OTP);
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 429) {
         showToast("Two many Requests. Try again later.", "error");
@@ -108,26 +102,19 @@ export default function Login() {
       return;
     }
     try {
-      const res = await axios.post(
-        process.env.NEXT_PUBLIC_API_BASE_URL! + "api/auth/resetpassword",
-        {
-          emailId: email,
-          newPassword: confirmPassword,
-          otp: otp,
-        },
-        {
-          withCredentials: true,
-        },
-      );
-      if (res.status === 200) {
-        showToast("Password reset successful. Please login.", "success");
-        setEmail("");
-        setPassword("");
-        setOtp("");
-        setNewPassword("");
-        setConfirmPassword("");
-        setStep(AuthStep.LOGIN);
-      }
+      resetPassword({
+        emailId: email,
+        newPassword: confirmPassword,
+        otp,
+      });
+
+      showToast("Password reset successful. Please login.", "success");
+      setEmail("");
+      setPassword("");
+      setOtp("");
+      setNewPassword("");
+      setConfirmPassword("");
+      setStep(AuthStep.LOGIN);
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 400) {
         showToast("Invalid or expired otp", "error");

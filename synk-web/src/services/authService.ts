@@ -11,7 +11,7 @@ const base_url = process.env.NEXT_PUBLIC_API_BASE_URL;
 export const authenticateUser = async (
   authType: AuthType,
   payload: IPayload,
-  dispatch: AppDispatch,
+  dispatch: AppDispatch
 ) => {
   const uri =
     authType === "login"
@@ -29,9 +29,28 @@ export const logoutUser = async (dispatch: AppDispatch) => {
   const res = await axios.post(
     `${base_url}api/auth/logout`,
     {},
-    { withCredentials: true },
+    { withCredentials: true }
   );
   if (res.data) dispatch(removeUser());
 
   return res;
+};
+
+export const sendOtp = async (email: string) => {
+  return await axios.post(
+    `${base_url}api/auth/forgotpassword`,
+    { emailId: email },
+    { withCredentials: true }
+  );
+};
+
+interface IResetPasswordPayload {
+  emailId: string;
+  newPassword: string;
+  otp: string;
+}
+export const resetPassword = async (payload: IResetPasswordPayload) => {
+  return await axios.post(`${base_url}api/auth/resetpassword`, payload, {
+    withCredentials: true,
+  });
 };
