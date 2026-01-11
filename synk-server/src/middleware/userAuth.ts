@@ -1,7 +1,6 @@
 import { Request, Response, NextFunction } from "express";
 import jwt from "jsonwebtoken";
-import User from "../models/User";
-import AuthProvider from "../models/AuthProvider";
+import { prisma } from "../lib/prisma";
 import { JwtPayload } from "../utils/types";
 
 export const userAuth = async (
@@ -17,14 +16,15 @@ export const userAuth = async (
     }
 
     //  Verify JWT
-    const decoded = (await jwt.verify(
+    const decoded = jwt.verify(
       token,
       process.env.JWT_SECRET as string
-    )) as JwtPayload;
-    const { _id } = decoded;
+    ) as JwtPayload;
+
+    const { userId } = decoded;
 
     //  Fetch user
-    const user = await User.findById(_id);
+    const user = await prisma.user.findUnique({ where: { id: userId } });
     if (!user) {
       return res.status(401).json({ message: "User not found" });
     }
@@ -33,11 +33,12 @@ export const userAuth = async (
      * Ensure user has at least one auth provider
      * (password OR google)
      */
-    const authProviderExists = await AuthProvider.exists({
-      userId: user._id,
+    const authProvider = await prisma.authProvider.findFirst({
+      where: { userId: user.id },
+      select: { id: true },
     });
 
-    if (!authProviderExists) {
+    if (!authProvider) {
       return res.status(401).json({ message: "Auth provider missing" });
     }
 

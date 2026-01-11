@@ -1,0 +1,96 @@
+  // This is your Prisma schema file,
+  // learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+  // Looking for ways to speed up your queries, or scale easily with your serverless or edge functions?
+  // Try Prisma Accelerate: https://pris.ly/cli/accelerate-init
+
+  datasource db {
+    provider = "postgresql"
+  }
+
+  generator client {
+    provider = "prisma-client-js"
+  }
+
+  model User {
+    id              String   @id @default(uuid()) @db.Uuid
+    emailId         String   @unique
+    name            String
+    avatarUrl       String?
+    lastLoginAt     DateTime?
+
+    resetOtp        String?
+    resetOtpExpiry  DateTime?
+    otpAttempts     Int      @default(0)
+
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    authProviders   AuthProvider[]
+    boardsOwned     Board[]           @relation("BoardOwner")
+    collaborations  BoardCollaborator[]
+  }
+
+  model Board {
+    id              String   @id @default(uuid()) @db.Uuid
+    title           String
+    slug            String
+    isArchived      Boolean  @default(false)
+    inviteToken     String?
+    isInviteEnabled Boolean  @default(true)
+    content   Json?
+    ownerId         String   @db.Uuid
+    owner           User     @relation("BoardOwner", fields: [ownerId], references: [id])
+
+    collaborators   BoardCollaborator[]
+
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    @@unique([ownerId, slug])
+  }
+
+  model BoardCollaborator {
+    id        String @id @default(uuid()) @db.Uuid
+
+    boardId   String @db.Uuid
+    userId    String @db.Uuid
+
+    role      BoardRole @default(EDITOR)
+
+    board     Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
+    user      User  @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    @@unique([boardId, userId])
+    @@index([userId])
+    @@index([boardId])
+  }
+
+
+  model AuthProvider {
+    id              String   @id @default(uuid()) @db.Uuid
+
+    userId          String   @db.Uuid
+    provider        AuthType
+    providerUserId  String
+    passwordHash    String? 
+    user            User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+    createdAt       DateTime @default(now())
+    updatedAt       DateTime @updatedAt
+
+    @@unique([userId, provider])
+    @@unique([provider, providerUserId])
+  }
+
+
+  enum BoardRole {
+    VIEWER
+    EDITOR
+  }
+
+  enum AuthType {
+    password
+    google
+  }
+

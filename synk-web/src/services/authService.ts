@@ -19,8 +19,9 @@ export const authenticateUser = async (
       : `${base_url}api/auth/signup`;
 
   const res = await axios.post(uri, payload, { withCredentials: true });
+  console.log(res);
   if (res.data) {
-    dispatch(addUser(res.data.savedUser));
+    dispatch(addUser(res.data.user));
   }
   return res;
 };

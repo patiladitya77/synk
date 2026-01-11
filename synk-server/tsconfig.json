@@ -5,7 +5,8 @@
       "@types/express": ["./node_modules/@types/express"]
     },
     "typeRoots": ["./src/types", "./node_modules/@types"],
-
+    "moduleResolution": "node",
+    "types": ["node"],
     /* Projects */
     // "incremental": true,                              /* Save .tsbuildinfo files to allow for incremental compilation of projects. */
     // "composite": true,                                /* Enable constraints that allow a TypeScript project to be used with project references. */
@@ -114,5 +115,7 @@
     // "skipDefaultLibCheck": true,                      /* Skip type checking .d.ts files that are included with TypeScript. */
     "skipLibCheck": true /* Skip type checking all .d.ts files. */
   },
-  "include": ["src"]
+  "include": ["src"],
+  "exclude": ["node_modules", "prisma.config.js"]
+
 }

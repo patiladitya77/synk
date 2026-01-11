@@ -41,7 +41,7 @@ const UserCanvases = () => {
       <TableBody>
         {canvases.map((canvas) => (
           <TableRow
-            key={canvas._id}
+            key={canvas.id}
             className="cursor-pointer hover:bg-muted"
             onClick={() => router.push(`/workspace/${canvas.slug}`)}
           >
