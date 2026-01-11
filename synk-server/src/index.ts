@@ -1,14 +1,18 @@
 import express from "express";
 import dotenv from "dotenv";
-import connectDB from "./config/database";
 import cors from "cors";
-dotenv.config();
 import cookieParser from "cookie-parser";
+
 import authRouter from "./routes/authRouter";
 import boardRouter from "./routes/boardRouter";
+
+dotenv.config();
+
 const app = express();
+
 app.use(express.json());
 app.use(cookieParser());
+
 app.use(
   cors({
     origin: "http://localhost:3000",
@@ -17,11 +21,12 @@ app.use(
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
+
 app.use("/api/auth", authRouter);
 app.use("/api/board", boardRouter);
-connectDB().then(() => {
-  console.log("Connection Established");
-  app.listen(process.env.PORT, () => {
-    console.log("server running on port 7777");
-  });
+
+const PORT = process.env.PORT || 7777;
+
+app.listen(PORT, () => {
+  console.log(`🚀 Server running on port ${PORT}`);
 });
