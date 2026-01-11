@@ -20,6 +20,9 @@ type Shape =
     };
 
 export default function Canvas() {
+  const isPlacingRef = useRef(false);
+  const previewPosRef = useRef({ x: 0, y: 0 });
+
   const toolRef = useRef<Tool>("rect");
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
@@ -81,36 +84,68 @@ export default function Canvas() {
     };
 
     const onMouseDown = (e: MouseEvent) => {
-      isDrawingRef.current = true;
-      startRef.current = getMousePos(e);
+      const { x, y } = getMousePos(e);
+
+      // 🧷 Place shape
+      if (isPlacingRef.current) {
+        if (toolRef.current === "rect") {
+          shapesRef.current.push({
+            type: "rect",
+            x: x - 50,
+            y: y - 30,
+            width: 100,
+            height: 60,
+          });
+        }
+
+        if (toolRef.current === "circle") {
+          shapesRef.current.push({
+            type: "circle",
+            cx: x,
+            cy: y,
+            r: 40,
+          });
+        }
+
+        isPlacingRef.current = false;
+        redraw();
+        return;
+      }
+
+      // (Optional) fallback to drag logic
     };
 
     const onMouseMove = (e: MouseEvent) => {
-      if (!isDrawingRef.current) return;
-
       const { x, y } = getMousePos(e);
-      const start = startRef.current;
+      previewPosRef.current = { x, y };
 
       redraw();
 
-      if (toolRef.current === "rect") {
-        drawShape({
-          type: "rect",
-          x: start.x,
-          y: start.y,
-          width: x - start.x,
-          height: y - start.y,
-        });
-      }
+      // 👻 Ghost preview follows cursor
+      if (isPlacingRef.current) {
+        ctx.save();
+        ctx.globalAlpha = 0.4;
 
-      if (toolRef.current === "circle") {
-        const r = Math.hypot(x - start.x, y - start.y);
-        drawShape({
-          type: "circle",
-          cx: start.x,
-          cy: start.y,
-          r,
-        });
+        if (toolRef.current === "rect") {
+          drawShape({
+            type: "rect",
+            x: x - 50,
+            y: y - 30,
+            width: 100,
+            height: 60,
+          });
+        }
+
+        if (toolRef.current === "circle") {
+          drawShape({
+            type: "circle",
+            cx: x,
+            cy: y,
+            r: 40,
+          });
+        }
+
+        ctx.restore();
       }
     };
 
@@ -163,7 +198,10 @@ export default function Canvas() {
       {/* Sidebar */}
       <div className="fixed left-0 top-0 h-full w-16 bg-white border-r flex flex-col items-center gap-4 py-4 z-10">
         <button
-          onClick={() => (toolRef.current = "rect")}
+          onClick={() => {
+            toolRef.current = "rect";
+            isPlacingRef.current = true;
+          }}
           className="w-10 h-10 text-black border rounded hover:bg-gray-100"
           title="Rectangle"
         >
@@ -171,7 +209,10 @@ export default function Canvas() {
         </button>
 
         <button
-          onClick={() => (toolRef.current = "circle")}
+          onClick={() => {
+            toolRef.current = "circle";
+            isPlacingRef.current = true;
+          }}
           className="w-10 h-10 border text-black  rounded hover:bg-gray-100"
           title="Circle"
         >
