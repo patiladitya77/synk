@@ -5,7 +5,6 @@ import crypto from "crypto";
 import sendEmail from "../utils/sendEmail";
 import { prisma } from "../lib/prisma";
 import jwt from "jsonwebtoken";
-import strict from "assert/strict";
 export const signupController = async (req: Request, res: Response) => {
   try {
     const { name, emailId, password } = req.body;
