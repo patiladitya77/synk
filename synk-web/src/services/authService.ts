@@ -1,4 +1,9 @@
-import { addUser, removeUser } from "@/utils/userSlice";
+import {
+  addUser,
+  removeUser,
+  setAccessToken,
+  setAuthLoading,
+} from "@/utils/userSlice";
 import axios from "axios";
 type AuthType = "login" | "signup";
 import { AppDispatch } from "../utils/appStore";
@@ -21,20 +26,27 @@ export const authenticateUser = async (
   const res = await axios.post(uri, payload, { withCredentials: true });
   console.log(res);
   if (res.data) {
+    dispatch(setAuthLoading(false));
+    dispatch(setAccessToken(res.data.accessToken));
     dispatch(addUser(res.data.user));
   }
   return res;
 };
 
 export const logoutUser = async (dispatch: AppDispatch) => {
-  const res = await axios.post(
-    `${base_url}api/auth/logout`,
-    {},
-    { withCredentials: true }
-  );
-  if (res.data) dispatch(removeUser());
-
-  return res;
+  try {
+    await axios.post(
+      `${base_url}api/auth/logout`,
+      {},
+      { withCredentials: true }
+    );
+  } catch (error) {
+    console.warn("Server logout failed:", error);
+  } finally {
+    // clearing client state
+    dispatch(removeUser());
+    dispatch(setAuthLoading(false));
+  }
 };
 
 export const sendOtp = async (email: string) => {
