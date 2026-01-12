@@ -9,37 +9,24 @@ export const userAuth = async (
   next: NextFunction
 ) => {
   try {
-    const token = req.cookies?.token;
+    const authHeader = req.headers.authorization;
 
-    if (!token) {
+    if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ message: "Please login" });
     }
-
+    const token = authHeader.split(" ")[1];
     //  Verify JWT
     const decoded = jwt.verify(
       token,
       process.env.JWT_SECRET as string
     ) as JwtPayload;
 
-    const { userId } = decoded;
-
     //  Fetch user
-    const user = await prisma.user.findUnique({ where: { id: userId } });
+    const user = await prisma.user.findUnique({
+      where: { id: decoded.userId },
+    });
     if (!user) {
       return res.status(401).json({ message: "User not found" });
-    }
-
-    /**
-     * Ensure user has at least one auth provider
-     * (password OR google)
-     */
-    const authProvider = await prisma.authProvider.findFirst({
-      where: { userId: user.id },
-      select: { id: true },
-    });
-
-    if (!authProvider) {
-      return res.status(401).json({ message: "Auth provider missing" });
     }
 
     //  Attach user to request
