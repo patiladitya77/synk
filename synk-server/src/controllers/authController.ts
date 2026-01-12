@@ -5,6 +5,7 @@ import crypto from "crypto";
 import sendEmail from "../utils/sendEmail";
 import { prisma } from "../lib/prisma";
 import jwt from "jsonwebtoken";
+import { generateAccessToken, generateRefreshToken } from "../utils/authTokens";
 export const signupController = async (req: Request, res: Response) => {
   try {
     const { name, emailId, password } = req.body;
@@ -35,22 +36,31 @@ export const signupController = async (req: Request, res: Response) => {
 
       return user;
     });
+    const refreshToken = generateRefreshToken();
 
-    // Generate JWT
-    const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET!, {
-      expiresIn: "7d",
+    await prisma.session.create({
+      data: {
+        userId: user.id,
+        refreshToken,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        userAgent: req.headers["user-agent"],
+        ipAddress: req.ip,
+      },
     });
 
+    const accessToken = generateAccessToken(user.id);
+
     //  Set cookie
-    res.cookie("token", token, {
+    res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
-      expires: new Date(Date.now() + 8 * 3600000),
-      // secure: process.env.NODE_ENV === "production",
-      // sameSite: "strict",
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
     res.status(201).json({
       message: "Signup successful",
+      accessToken,
       user: {
         id: user.id,
         name: user.name,
@@ -58,23 +68,28 @@ export const signupController = async (req: Request, res: Response) => {
       },
     });
   } catch (err: any) {
-    console.error(err);
-
-    res.status(400).json({
-      message: err.message || "Signup failed",
-    });
+    console.error("Signup error:", err);
+    if (err.code === "P2002") {
+      return res.status(409).json({ message: "Email already registered" });
+    }
+    return res.status(400).json({ message: "Signup failed" });
   }
 };
 
 export const loginController = async (req: Request, res: Response) => {
   try {
     const { emailId, password } = req.body;
-    // const user = await User.findOne({ emailId: emailId }).select("+password");
-    const user = await prisma.user.findUnique({ where: { emailId } });
+
+    /*  Find user */
+    const user = await prisma.user.findUnique({
+      where: { emailId },
+    });
+
     if (!user) {
-      return res.status(401).send("invalid credentials");
+      return res.status(401).json({ message: "Invalid credentials" });
     }
 
+    /*  Get password auth provider */
     const passwordProvider = await prisma.authProvider.findUnique({
       where: {
         userId_provider: {
@@ -84,41 +99,135 @@ export const loginController = async (req: Request, res: Response) => {
       },
     });
 
-    if (!passwordProvider || !passwordProvider.passwordHash) {
+    if (!passwordProvider?.passwordHash) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
-    const isPasswordValid = await bcrypt.compare(
+
+    /*  Verify password */
+    const isValidPassword = await bcrypt.compare(
       password,
       passwordProvider.passwordHash
     );
-    if (isPasswordValid) {
-      //create a token
-      const token = jwt.sign({ userId: user.id }, process.env.JWT_SECRET!, {
-        expiresIn: "7d",
-      });
 
-      //sending cookie back to user
-      res.cookie("token", token, {
-        httpOnly: true,
-        secure: process.env.NODE_ENV === "production",
-        expires: new Date(Date.now() + 8 * 3600000),
-        sameSite: "strict",
-      });
-
-      res.json({
-        message: "Login successful",
-        user: {
-          id: user.id,
-          name: user.name,
-          emailId: user.emailId,
-          avatarUrl: user.avatarUrl,
-        },
-      });
-    } else {
-      return res.status(401).send("invalid credentials");
+    if (!isValidPassword) {
+      return res.status(401).json({ message: "Invalid credentials" });
     }
+
+    /* Revoke existing sessions  */
+    await prisma.session.updateMany({
+      where: {
+        userId: user.id,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
+
+    /* Enforce session limit */
+    const activeSessionCount = await prisma.session.count({
+      where: {
+        userId: user.id,
+        revokedAt: null,
+      },
+    });
+
+    if (activeSessionCount >= 5) {
+      return res.status(403).json({
+        message: "Too many active sessions",
+      });
+    }
+
+    /*  Create new session */
+    const refreshToken = generateRefreshToken();
+
+    await prisma.session.create({
+      data: {
+        userId: user.id,
+        refreshToken,
+        expiresAt: new Date(Date.now() + 7 * 24 * 60 * 60 * 1000),
+        userAgent: req.headers["user-agent"],
+        ipAddress: req.ip,
+      },
+    });
+
+    /* Generate access token */
+    const accessToken = generateAccessToken(user.id);
+
+    /* Set refresh token cookie */
+    res.cookie("refreshToken", refreshToken, {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+      maxAge: 7 * 24 * 60 * 60 * 1000,
+    });
+
+    return res.json({
+      message: "Login successful",
+      accessToken,
+      user: {
+        id: user.id,
+        name: user.name,
+        emailId: user.emailId,
+        avatarUrl: user.avatarUrl,
+      },
+    });
   } catch (err) {
-    res.status(400).json({ message: "ERROR " + err });
+    console.error("Login error:", err);
+    return res.status(500).json({ message: "Login failed" });
+  }
+};
+
+export const refreshController = async (req: Request, res: Response) => {
+  const refreshToken = req.cookies.refreshToken;
+
+  if (!refreshToken) {
+    return res.status(401).json({ message: "No refresh token" });
+  }
+
+  const session = await prisma.session.findUnique({
+    where: { refreshToken },
+  });
+
+  if (!session || session.revokedAt || session.expiresAt < new Date()) {
+    return res.status(401).json({ message: "Invalid session" });
+  }
+
+  const accessToken = generateAccessToken(session.userId);
+
+  res.json({ accessToken });
+};
+
+export const meController = async (req: Request, res: Response) => {
+  try {
+    const userId = req.user?.id;
+
+    if (!userId) {
+      return res.status(401).json({ message: "Unauthorized" });
+    }
+
+    const user = await prisma.user.findUnique({
+      where: { id: userId },
+      select: {
+        id: true,
+        name: true,
+        emailId: true,
+        avatarUrl: true,
+        createdAt: true,
+        lastLoginAt: true,
+      },
+    });
+
+    if (!user) {
+      return res.status(401).json({ message: "User not found" });
+    }
+
+    return res.json({
+      user,
+    });
+  } catch (err) {
+    console.error("ME error:", err);
+    return res.status(500).json({ message: "Failed to fetch user" });
   }
 };
 
@@ -218,6 +327,35 @@ export const resetPasswordController = async (req: Request, res: Response) => {
 };
 
 export const logoutController = async (req: Request, res: Response) => {
-  res.cookie("token", null, { expires: new Date(Date.now()) });
-  res.send("logout successfull");
+  try {
+    const refreshToken = req.cookies?.refreshToken;
+
+    if (refreshToken) {
+      await prisma.session.updateMany({
+        where: {
+          refreshToken,
+          revokedAt: null,
+        },
+        data: {
+          revokedAt: new Date(),
+        },
+      });
+    }
+
+    // Clear refresh token cookie
+    res.clearCookie("refreshToken", {
+      httpOnly: true,
+      secure: process.env.NODE_ENV === "production",
+      sameSite: "strict",
+    });
+
+    return res.json({ message: "Logout successful" });
+  } catch (error) {
+    console.error("Logout error:", error);
+
+    // Still clear cookie even if DB fails
+    res.clearCookie("refreshToken");
+
+    return res.json({ message: "Logout successful" });
+  }
 };
