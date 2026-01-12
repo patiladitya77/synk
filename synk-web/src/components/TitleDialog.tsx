@@ -9,6 +9,7 @@ import {
   DialogTitle,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import api from "@/utils/axiosInterceptor";
 import axios from "axios";
 import { useEffect, useState } from "react";
 interface Props {
@@ -32,7 +33,7 @@ const TitleDialog = ({
     const checkAvailabilty = async () => {
       setChecking(true);
       try {
-        const res = await axios.get(
+        const res = await api.get(
           process.env.NEXT_PUBLIC_API_BASE_URL + "api/board/checkname",
           {
             params: { title },
