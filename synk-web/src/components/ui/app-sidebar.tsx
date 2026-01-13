@@ -21,11 +21,12 @@ import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import { BadgeCheck, Bell, LogOut, Sparkles } from "lucide-react";
 import { useRouter } from "next/navigation";
 import { logoutUser } from "@/services/authService";
-import { useDispatch } from "react-redux";
-
+import { useDispatch, useSelector } from "react-redux";
+import { RootState } from "@/utils/appStore";
 export function AppSidebar() {
   const dispatch = useDispatch();
   const router = useRouter();
+  const user = useSelector((store: RootState) => store.user.user);
   const handleLogout = async () => {
     try {
       await logoutUser(dispatch);
@@ -34,6 +35,7 @@ export function AppSidebar() {
       console.log(error);
     }
   };
+
   return (
     <Sidebar collapsible="icon">
       <SidebarHeader />
@@ -51,12 +53,14 @@ export function AppSidebar() {
                 >
                   <Avatar className="h-8 w-8 rounded-lg">
                     <AvatarImage src="/avatar.png" alt="User" />
-                    <AvatarFallback className="rounded-lg">AP</AvatarFallback>
+                    <AvatarFallback className="rounded-lg">
+                      {user?.name[0].toUpperCase()}
+                    </AvatarFallback>
                   </Avatar>
 
                   <div className="grid flex-1 text-left text-sm leading-tight">
-                    <span className="truncate font-semibold">Aditya Patil</span>
-                    <span className="truncate text-xs">aditya@email.com</span>
+                    <span className="truncate font-semibold">{user?.name}</span>
+                    <span className="truncate text-xs">{user?.emailId}</span>
                   </div>
                 </SidebarMenuButton>
               </DropdownMenuTrigger>
@@ -67,17 +71,18 @@ export function AppSidebar() {
                 align="end"
                 sideOffset={4}
               >
-                {/* 🔹 USER INFO (TOP) */}
                 <div className="flex items-center gap-3 px-3 py-2">
                   <Avatar className="h-8 w-8 rounded-lg">
                     <AvatarImage src="/avatar.png" alt="shadcn" />
-                    <AvatarFallback className="rounded-lg">SH</AvatarFallback>
+                    <AvatarFallback className="rounded-lg">
+                      {user?.name[0]?.toUpperCase()}
+                    </AvatarFallback>
                   </Avatar>
 
                   <div className="flex flex-col text-sm leading-tight">
-                    <span className="font-semibold">shadcn</span>
+                    <span className="font-semibold">{user?.name}</span>
                     <span className="text-xs text-muted-foreground">
-                      m@example.com
+                      {user?.emailId}
                     </span>
                   </div>
                 </div>

@@ -3,6 +3,7 @@ import CreateCanvasCard from "@/components/CreateCanvasCard";
 import TitleDialog from "@/components/TitleDialog";
 import { useGlobalToast } from "@/components/Toast-provider";
 import UserCanvases from "@/components/UserCanvases";
+import api from "@/utils/axiosInterceptor";
 import axios from "axios";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
@@ -14,7 +15,7 @@ export default function Dashboard() {
   const { showToast } = useGlobalToast();
   const handleCreateCanvas = async () => {
     try {
-      const res = await axios.post(
+      const res = await api.post(
         process.env.NEXT_PUBLIC_API_BASE_URL + "api/board/create",
         {
           title: title,
