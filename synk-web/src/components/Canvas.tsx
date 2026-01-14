@@ -240,21 +240,37 @@ export default function Canvas() {
     const onWheel = (e: WheelEvent) => {
       e.preventDefault();
 
+      const rect = canvas.getBoundingClientRect();
+      const mouseX = e.clientX - rect.left;
+      const mouseY = e.clientY - rect.top;
+
+      const camera = cameraRef.current;
+
       const isZoomGesture = e.ctrlKey || e.metaKey;
 
       if (isZoomGesture) {
-        //  ZOOM
-        const { zoom } = cameraRef.current;
-        const ZOOM_SENSITIVITY = 0.003;
+        //  ZOOM TO CURSOR
+        const ZOOM_SENSITIVITY = 0.004;
 
-        const delta = -e.deltaY * ZOOM_SENSITIVITY;
-        const newZoom = zoom * Math.exp(delta);
+        const zoomDelta = -e.deltaY * ZOOM_SENSITIVITY;
+        const newZoom = camera.zoom * Math.exp(zoomDelta);
 
-        cameraRef.current.zoom = Math.min(Math.max(newZoom, 0.2), 5);
+        const clampedZoom = Math.min(Math.max(newZoom, 0.2), 5);
+
+        // world position before zoom
+        const worldX = (mouseX - camera.x) / camera.zoom;
+        const worldY = (mouseY - camera.y) / camera.zoom;
+
+        // update zoom
+        camera.zoom = clampedZoom;
+
+        // adjust camera so cursor stays fixed
+        camera.x = mouseX - worldX * camera.zoom;
+        camera.y = mouseY - worldY * camera.zoom;
       } else {
-        // PAN (trackpad two-finger)
-        cameraRef.current.x -= e.deltaX;
-        cameraRef.current.y -= e.deltaY;
+        //  TRACKPAD PAN
+        camera.x -= e.deltaX;
+        camera.y -= e.deltaY;
       }
 
       redraw();
