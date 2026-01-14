@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useRef } from "react";
+import CanvasTopBar from "./CanvasTopBar";
 
 type Tool = "rect" | "circle";
 
@@ -20,14 +21,21 @@ type Shape =
     };
 
 export default function Canvas() {
+  const cameraRef = useRef({
+    x: 0, // pan X
+    y: 0, // pan Y
+    zoom: 1, // scale
+  });
+
   const isPlacingRef = useRef(false);
+  const lastPanRef = useRef({ x: 0, y: 0 });
+  const isPanningRef = useRef(false);
   const previewPosRef = useRef({ x: 0, y: 0 });
 
   const toolRef = useRef<Tool>("rect");
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const shapesRef = useRef<Shape[]>([]);
-  const isDrawingRef = useRef(false);
   const startRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
@@ -50,14 +58,20 @@ export default function Canvas() {
       canvas.style.height = `${height}px`;
 
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
+      drawGrid();
       redraw();
     };
 
-    const getMousePos = (e: MouseEvent) => {
+    const getWorldPos = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
+      const { x, y, zoom } = cameraRef.current;
+
+      const screenX = e.clientX - rect.left;
+      const screenY = e.clientY - rect.top;
+
       return {
-        x: e.clientX - rect.left,
-        y: e.clientY - rect.top,
+        x: (screenX - x) / zoom,
+        y: (screenY - y) / zoom,
       };
     };
 
@@ -80,13 +94,29 @@ export default function Canvas() {
 
     const redraw = () => {
       drawBackground();
+      drawGrid();
+      ctx.save();
+
+      const { x, y, zoom } = cameraRef.current;
+
+      // world => screen transform
+      ctx.translate(x, y);
+      ctx.scale(zoom, zoom);
+
       shapesRef.current.forEach(drawShape);
+
+      ctx.restore();
     };
 
     const onMouseDown = (e: MouseEvent) => {
-      const { x, y } = getMousePos(e);
-
-      // 🧷 Place shape
+      const { x, y } = getWorldPos(e);
+      if (e.button === 1) {
+        // middle mouse
+        isPanningRef.current = true;
+        lastPanRef.current = { x: e.clientX, y: e.clientY };
+        return;
+      }
+      //  Place shape
       if (isPlacingRef.current) {
         if (toolRef.current === "rect") {
           shapesRef.current.push({
@@ -111,19 +141,77 @@ export default function Canvas() {
         redraw();
         return;
       }
+    };
+    const drawGrid = () => {
+      const { x, y, zoom } = cameraRef.current;
+      const gridSize = 50;
 
-      // (Optional) fallback to drag logic
+      const width = canvas.width / (window.devicePixelRatio || 1);
+      const height = canvas.height / (window.devicePixelRatio || 1);
+
+      // visible world bounds
+      const left = -x / zoom;
+      const right = left + width / zoom;
+      const top = -y / zoom;
+      const bottom = top + height / zoom;
+
+      ctx.save();
+      ctx.translate(x, y);
+      ctx.scale(zoom, zoom);
+
+      ctx.strokeStyle = "#e5e7eb";
+      ctx.lineWidth = 1 / zoom;
+
+      // vertical lines
+      for (
+        let gx = Math.floor(left / gridSize) * gridSize;
+        gx <= right;
+        gx += gridSize
+      ) {
+        ctx.beginPath();
+        ctx.moveTo(gx, top);
+        ctx.lineTo(gx, bottom);
+        ctx.stroke();
+      }
+
+      // horizontal lines
+      for (
+        let gy = Math.floor(top / gridSize) * gridSize;
+        gy <= bottom;
+        gy += gridSize
+      ) {
+        ctx.beginPath();
+        ctx.moveTo(left, gy);
+        ctx.lineTo(right, gy);
+        ctx.stroke();
+      }
+
+      ctx.restore();
     };
 
     const onMouseMove = (e: MouseEvent) => {
-      const { x, y } = getMousePos(e);
+      if (isPanningRef.current) {
+        const dx = e.clientX - lastPanRef.current.x;
+        const dy = e.clientY - lastPanRef.current.y;
+
+        cameraRef.current.x += dx;
+        cameraRef.current.y += dy;
+
+        lastPanRef.current = { x: e.clientX, y: e.clientY };
+      }
+
+      const { x, y } = getWorldPos(e);
       previewPosRef.current = { x, y };
 
       redraw();
 
-      // 👻 Ghost preview follows cursor
       if (isPlacingRef.current) {
         ctx.save();
+
+        const { x: cx, y: cy, zoom } = cameraRef.current;
+        ctx.translate(cx, cy);
+        ctx.scale(zoom, zoom);
+
         ctx.globalAlpha = 0.4;
 
         if (toolRef.current === "rect") {
@@ -149,34 +237,31 @@ export default function Canvas() {
       }
     };
 
-    const onMouseUp = (e: MouseEvent) => {
-      if (!isDrawingRef.current) return;
-      isDrawingRef.current = false;
+    const onWheel = (e: WheelEvent) => {
+      e.preventDefault();
 
-      const { x, y } = getMousePos(e);
-      const start = startRef.current;
+      const isZoomGesture = e.ctrlKey || e.metaKey;
 
-      if (toolRef.current === "rect") {
-        shapesRef.current.push({
-          type: "rect",
-          x: start.x,
-          y: start.y,
-          width: x - start.x,
-          height: y - start.y,
-        });
-      }
+      if (isZoomGesture) {
+        //  ZOOM
+        const { zoom } = cameraRef.current;
+        const ZOOM_SENSITIVITY = 0.003;
 
-      if (toolRef.current === "circle") {
-        const r = Math.hypot(x - start.x, y - start.y);
-        shapesRef.current.push({
-          type: "circle",
-          cx: start.x,
-          cy: start.y,
-          r,
-        });
+        const delta = -e.deltaY * ZOOM_SENSITIVITY;
+        const newZoom = zoom * Math.exp(delta);
+
+        cameraRef.current.zoom = Math.min(Math.max(newZoom, 0.2), 5);
+      } else {
+        // PAN (trackpad two-finger)
+        cameraRef.current.x -= e.deltaX;
+        cameraRef.current.y -= e.deltaY;
       }
 
       redraw();
+    };
+
+    const onMouseUp = (e: MouseEvent) => {
+      isPanningRef.current = false;
     };
 
     resize();
@@ -184,48 +269,33 @@ export default function Canvas() {
     canvas.addEventListener("mousedown", onMouseDown);
     canvas.addEventListener("mousemove", onMouseMove);
     canvas.addEventListener("mouseup", onMouseUp);
+    canvas.addEventListener("wheel", onWheel, { passive: false });
 
     return () => {
       window.removeEventListener("resize", resize);
       canvas.removeEventListener("mousedown", onMouseDown);
       canvas.removeEventListener("mousemove", onMouseMove);
       canvas.removeEventListener("mouseup", onMouseUp);
+      canvas.removeEventListener("wheel", onWheel);
     };
   }, []);
 
   return (
     <>
-      {/* Sidebar */}
-      <div className="fixed left-0 top-0 h-full w-16 bg-white border-r flex flex-col items-center gap-4 py-4 z-10">
-        <button
-          onClick={() => {
-            toolRef.current = "rect";
-            isPlacingRef.current = true;
-          }}
-          className="w-10 h-10 text-black border rounded hover:bg-gray-100"
-          title="Rectangle"
-        >
-          rect
-        </button>
-
-        <button
-          onClick={() => {
-            toolRef.current = "circle";
-            isPlacingRef.current = true;
-          }}
-          className="w-10 h-10 border text-black  rounded hover:bg-gray-100"
-          title="Circle"
-        >
-          circle
-        </button>
-      </div>
+      {/* TopBar */}
+      <CanvasTopBar
+        onSelectRect={() => {
+          toolRef.current = "rect";
+          isPlacingRef.current = true;
+        }}
+        onSelectCircle={() => {
+          toolRef.current = "circle";
+          isPlacingRef.current = true;
+        }}
+      />
 
       {/* Canvas */}
-      <canvas
-        ref={canvasRef}
-        className="fixed inset-0"
-        style={{ marginLeft: 64 }}
-      />
+      <canvas ref={canvasRef} className="fixed inset-0" />
     </>
   );
 }
