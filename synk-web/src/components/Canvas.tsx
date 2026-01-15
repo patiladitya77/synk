@@ -2,25 +2,14 @@
 
 import { useEffect, useRef } from "react";
 import CanvasTopBar from "./CanvasTopBar";
-
-type Tool = "rect" | "circle";
-
-type Shape =
-  | {
-      type: "rect";
-      x: number;
-      y: number;
-      width: number;
-      height: number;
-    }
-  | {
-      type: "circle";
-      cx: number;
-      cy: number;
-      r: number;
-    };
+import { TOOLS } from "@/canvas-engine/tools";
+import { render } from "@/canvas-engine/renderer";
+import { Shape } from "@/canvas-engine/types";
+import { pan, zoomAt } from "@/canvas-engine/camera";
 
 export default function Canvas() {
+  const activeToolRef = useRef(TOOLS.rect);
+
   const cameraRef = useRef({
     x: 0, // pan X
     y: 0, // pan Y
@@ -30,23 +19,14 @@ export default function Canvas() {
   const isPlacingRef = useRef(false);
   const lastPanRef = useRef({ x: 0, y: 0 });
   const isPanningRef = useRef(false);
-  const previewPosRef = useRef({ x: 0, y: 0 });
-
-  const toolRef = useRef<Tool>("rect");
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const shapesRef = useRef<Shape[]>([]);
-  const startRef = useRef({ x: 0, y: 0 });
 
   useEffect(() => {
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
     const DPR = window.devicePixelRatio || 1;
-
-    const drawBackground = () => {
-      ctx.fillStyle = "#f8fafc";
-      ctx.fillRect(0, 0, canvas.width, canvas.height);
-    };
 
     const resize = () => {
       const width = window.innerWidth;
@@ -58,8 +38,13 @@ export default function Canvas() {
       canvas.style.height = `${height}px`;
 
       ctx.setTransform(DPR, 0, 0, DPR, 0, 0);
-      drawGrid();
-      redraw();
+
+      render({
+        ctx,
+        canvas,
+        camera: cameraRef.current,
+        shapes: shapesRef.current,
+      });
     };
 
     const getWorldPos = (e: MouseEvent) => {
@@ -75,39 +60,6 @@ export default function Canvas() {
       };
     };
 
-    const drawShape = (shape: Shape) => {
-      ctx.strokeStyle = "#0f172a";
-      ctx.lineWidth = 2;
-      ctx.lineCap = "round";
-      ctx.lineJoin = "round";
-
-      if (shape.type === "rect") {
-        ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);
-      }
-
-      if (shape.type === "circle") {
-        ctx.beginPath();
-        ctx.arc(shape.cx, shape.cy, shape.r, 0, Math.PI * 2);
-        ctx.stroke();
-      }
-    };
-
-    const redraw = () => {
-      drawBackground();
-      drawGrid();
-      ctx.save();
-
-      const { x, y, zoom } = cameraRef.current;
-
-      // world => screen transform
-      ctx.translate(x, y);
-      ctx.scale(zoom, zoom);
-
-      shapesRef.current.forEach(drawShape);
-
-      ctx.restore();
-    };
-
     const onMouseDown = (e: MouseEvent) => {
       const { x, y } = getWorldPos(e);
       if (e.button === 1) {
@@ -118,75 +70,24 @@ export default function Canvas() {
       }
       //  Place shape
       if (isPlacingRef.current) {
-        if (toolRef.current === "rect") {
-          shapesRef.current.push({
-            type: "rect",
-            x: x - 50,
-            y: y - 30,
-            width: 100,
-            height: 60,
-          });
-        }
+        const tool = activeToolRef.current;
 
-        if (toolRef.current === "circle") {
-          shapesRef.current.push({
-            type: "circle",
-            cx: x,
-            cy: y,
-            r: 40,
-          });
+        const shape = tool.onPointerDown?.({ x, y });
+
+        if (shape) {
+          shapesRef.current.push(shape);
         }
 
         isPlacingRef.current = false;
-        redraw();
+        render({
+          ctx,
+          canvas,
+          camera: cameraRef.current,
+          shapes: shapesRef.current,
+        });
+
         return;
       }
-    };
-    const drawGrid = () => {
-      const { x, y, zoom } = cameraRef.current;
-      const gridSize = 50;
-
-      const width = canvas.width / (window.devicePixelRatio || 1);
-      const height = canvas.height / (window.devicePixelRatio || 1);
-
-      // visible world bounds
-      const left = -x / zoom;
-      const right = left + width / zoom;
-      const top = -y / zoom;
-      const bottom = top + height / zoom;
-
-      ctx.save();
-      ctx.translate(x, y);
-      ctx.scale(zoom, zoom);
-
-      ctx.strokeStyle = "#e5e7eb";
-      ctx.lineWidth = 1 / zoom;
-
-      // vertical lines
-      for (
-        let gx = Math.floor(left / gridSize) * gridSize;
-        gx <= right;
-        gx += gridSize
-      ) {
-        ctx.beginPath();
-        ctx.moveTo(gx, top);
-        ctx.lineTo(gx, bottom);
-        ctx.stroke();
-      }
-
-      // horizontal lines
-      for (
-        let gy = Math.floor(top / gridSize) * gridSize;
-        gy <= bottom;
-        gy += gridSize
-      ) {
-        ctx.beginPath();
-        ctx.moveTo(left, gy);
-        ctx.lineTo(right, gy);
-        ctx.stroke();
-      }
-
-      ctx.restore();
     };
 
     const onMouseMove = (e: MouseEvent) => {
@@ -194,47 +95,24 @@ export default function Canvas() {
         const dx = e.clientX - lastPanRef.current.x;
         const dy = e.clientY - lastPanRef.current.y;
 
-        cameraRef.current.x += dx;
-        cameraRef.current.y += dy;
-
+        pan(cameraRef.current, dx, dy);
         lastPanRef.current = { x: e.clientX, y: e.clientY };
       }
 
       const { x, y } = getWorldPos(e);
-      previewPosRef.current = { x, y };
 
-      redraw();
+      const tool = activeToolRef.current;
+      const previewShape = isPlacingRef.current
+        ? tool.getPreview?.({ x, y }) ?? undefined
+        : undefined;
 
-      if (isPlacingRef.current) {
-        ctx.save();
-
-        const { x: cx, y: cy, zoom } = cameraRef.current;
-        ctx.translate(cx, cy);
-        ctx.scale(zoom, zoom);
-
-        ctx.globalAlpha = 0.4;
-
-        if (toolRef.current === "rect") {
-          drawShape({
-            type: "rect",
-            x: x - 50,
-            y: y - 30,
-            width: 100,
-            height: 60,
-          });
-        }
-
-        if (toolRef.current === "circle") {
-          drawShape({
-            type: "circle",
-            cx: x,
-            cy: y,
-            r: 40,
-          });
-        }
-
-        ctx.restore();
-      }
+      render({
+        ctx,
+        canvas,
+        camera: cameraRef.current,
+        shapes: shapesRef.current,
+        preview: previewShape,
+      });
     };
 
     const onWheel = (e: WheelEvent) => {
@@ -262,18 +140,19 @@ export default function Canvas() {
         const worldY = (mouseY - camera.y) / camera.zoom;
 
         // update zoom
-        camera.zoom = clampedZoom;
-
-        // adjust camera so cursor stays fixed
-        camera.x = mouseX - worldX * camera.zoom;
-        camera.y = mouseY - worldY * camera.zoom;
+        zoomAt(cameraRef.current, clampedZoom / camera.zoom, mouseX, mouseY);
       } else {
         //  TRACKPAD PAN
         camera.x -= e.deltaX;
         camera.y -= e.deltaY;
       }
 
-      redraw();
+      render({
+        ctx,
+        canvas,
+        camera: cameraRef.current,
+        shapes: shapesRef.current,
+      });
     };
 
     const onMouseUp = (e: MouseEvent) => {
@@ -301,11 +180,11 @@ export default function Canvas() {
       {/* TopBar */}
       <CanvasTopBar
         onSelectRect={() => {
-          toolRef.current = "rect";
+          activeToolRef.current = TOOLS.rect;
           isPlacingRef.current = true;
         }}
         onSelectCircle={() => {
-          toolRef.current = "circle";
+          activeToolRef.current = TOOLS.circle;
           isPlacingRef.current = true;
         }}
       />
