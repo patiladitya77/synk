@@ -30,6 +30,8 @@ import {
   resetPassword,
   sendOtp,
 } from "@/services/authService";
+import { GoogleLogin } from "@react-oauth/google";
+import { addUser, setAccessToken } from "@/utils/userSlice";
 
 enum AuthStep {
   LOGIN = "login",
@@ -58,7 +60,7 @@ export default function Login() {
       await authenticateUser(
         "login",
         { emailId: email, password: password },
-        dispatch
+        dispatch,
       );
 
       showToast("Welcome back!", "success");
@@ -250,9 +252,31 @@ export default function Login() {
               <Button className="w-full" onClick={handleLogin}>
                 Login
               </Button>
-              <Button variant="outline" className="w-full">
-                Login with Google
-              </Button>
+              <div className="w-full flex justify-center">
+                <GoogleLogin
+                  width="100%"
+                  onSuccess={async (credentialResponse) => {
+                    try {
+                      const res = await axios.post(
+                        `${process.env.NEXT_PUBLIC_API_BASE_URL}api/auth/google`,
+                        { idToken: credentialResponse.credential },
+                        { withCredentials: true },
+                      );
+
+                      dispatch(setAccessToken(res.data.accessToken));
+                      dispatch(addUser(res.data.user));
+
+                      showToast("Logged in with Google", "success");
+                      router.push("/dashboard");
+                    } catch (error) {
+                      showToast("Google login failed", "error");
+                    }
+                  }}
+                  onError={() => {
+                    showToast("Google login failed", "error");
+                  }}
+                />
+              </div>
             </>
           )}
 
