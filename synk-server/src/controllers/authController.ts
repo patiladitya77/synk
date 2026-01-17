@@ -181,6 +181,12 @@ export const loginController = async (req: Request, res: Response) => {
     /* Generate access token */
     const accessToken = generateAccessToken(user.id);
 
+    // update last login
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
+
     /* Set refresh token cookie */
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,

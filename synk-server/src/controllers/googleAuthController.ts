@@ -38,15 +38,6 @@ export const googleAuthController = async (req: Request, res: Response) => {
             emailId: email,
             name: name || "Google User",
             avatarUrl: picture,
-            lastLoginAt: new Date(),
-          },
-        });
-      } else {
-        await tx.user.update({
-          where: { id: user.id },
-          data: {
-            lastLoginAt: new Date(),
-            avatarUrl: picture ?? user.avatarUrl,
           },
         });
       }
@@ -54,12 +45,14 @@ export const googleAuthController = async (req: Request, res: Response) => {
       //  Link Google provider if not exists
       await tx.authProvider.upsert({
         where: {
-          provider_providerUserId: {
+          userId_provider: {
+            userId: user.id,
             provider: "google",
-            providerUserId: googleUserId,
           },
         },
-        update: {},
+        update: {
+          providerUserId: googleUserId,
+        },
         create: {
           userId: user.id,
           provider: "google",
@@ -69,6 +62,18 @@ export const googleAuthController = async (req: Request, res: Response) => {
 
       return user;
     });
+    const activeSessionCount = await prisma.session.count({
+      where: {
+        userId: user.id,
+        revokedAt: null,
+      },
+    });
+
+    if (activeSessionCount >= 5) {
+      return res.status(403).json({
+        message: "Too many active sessions",
+      });
+    }
 
     //  Create session (same as login)
     const refreshToken = generateRefreshToken();
@@ -84,6 +89,12 @@ export const googleAuthController = async (req: Request, res: Response) => {
     });
 
     const accessToken = generateAccessToken(user.id);
+
+    //update last login
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
 
     //  Set cookie
     res.cookie("refreshToken", refreshToken, {
