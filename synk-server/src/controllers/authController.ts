@@ -325,28 +325,34 @@ export const resetPasswordController = async (req: Request, res: Response) => {
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    await prisma.$transaction([
-      prisma.authProvider.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.authProvider.upsert({
         where: {
           userId_provider: {
             userId: user.id,
             provider: "password",
           },
         },
-        data: {
+        update: {
           passwordHash,
         },
-      }),
+        create: {
+          userId: user.id,
+          provider: "password",
+          providerUserId: user.id,
+          passwordHash,
+        },
+      });
 
-      prisma.user.update({
+      await tx.user.update({
         where: { id: user.id },
         data: {
           resetOtp: null,
           resetOtpExpiry: null,
           otpAttempts: 0,
         },
-      }),
-    ]);
+      });
+    });
 
     res.json({ message: "Password reset successful" });
   } catch (err) {
