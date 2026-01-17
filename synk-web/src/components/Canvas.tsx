@@ -8,6 +8,12 @@ import { Shape } from "@/canvas-engine/types";
 import { pan, zoomAt } from "@/canvas-engine/camera";
 
 export default function Canvas() {
+  const selectedShapeRef = useRef<Shape | null>(null);
+  const isDraggingRef = useRef(false);
+  const isResizingRef = useRef(false);
+  const resizeHandleRef = useRef<"tl" | "tr" | "bl" | "br" | null>(null);
+  const dragStartRef = useRef({ x: 0, y: 0 });
+
   const activeToolRef = useRef(TOOLS.rect);
 
   const cameraRef = useRef({
@@ -22,6 +28,25 @@ export default function Canvas() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const shapesRef = useRef<Shape[]>([]);
+
+  function hitTest(shape: Shape, x: number, y: number) {
+    if (shape.type === "rect") {
+      return (
+        x >= shape.x &&
+        x <= shape.x + shape.width &&
+        y >= shape.y &&
+        y <= shape.y + shape.height
+      );
+    }
+
+    if (shape.type === "circle") {
+      const dx = x - shape.cx;
+      const dy = y - shape.cy;
+      return dx * dx + dy * dy <= shape.r * shape.r;
+    }
+
+    return false;
+  }
 
   useEffect(() => {
     const canvas = canvasRef.current!;
@@ -44,6 +69,7 @@ export default function Canvas() {
         canvas,
         camera: cameraRef.current,
         shapes: shapesRef.current,
+        selectedShape: selectedShapeRef.current,
       });
     };
 
@@ -68,6 +94,41 @@ export default function Canvas() {
         lastPanRef.current = { x: e.clientX, y: e.clientY };
         return;
       }
+      // 1️ check if clicking on existing shape
+      let hitAnyShape = false;
+
+      for (let i = shapesRef.current.length - 1; i >= 0; i--) {
+        const shape = shapesRef.current[i];
+        if (hitTest(shape, x, y)) {
+          selectedShapeRef.current = shape;
+          isDraggingRef.current = true;
+          dragStartRef.current = { x, y };
+          hitAnyShape = true;
+
+          render({
+            ctx,
+            canvas,
+            camera: cameraRef.current,
+            shapes: shapesRef.current,
+            selectedShape: selectedShapeRef.current,
+          });
+          return;
+        }
+      }
+
+      //  CLICKED EMPTY SPACE → UNSELECT
+      if (!hitAnyShape) {
+        selectedShapeRef.current = null;
+
+        render({
+          ctx,
+          canvas,
+          camera: cameraRef.current,
+          shapes: shapesRef.current,
+          selectedShape: null,
+        });
+      }
+
       //  Place shape
       if (isPlacingRef.current) {
         const tool = activeToolRef.current;
@@ -84,6 +145,7 @@ export default function Canvas() {
           canvas,
           camera: cameraRef.current,
           shapes: shapesRef.current,
+          selectedShape: selectedShapeRef.current,
         });
 
         return;
@@ -100,6 +162,22 @@ export default function Canvas() {
       }
 
       const { x, y } = getWorldPos(e);
+      if (isDraggingRef.current && selectedShapeRef.current) {
+        const dx = x - dragStartRef.current.x;
+        const dy = y - dragStartRef.current.y;
+
+        const shape = selectedShapeRef.current;
+
+        if (shape.type === "rect") {
+          shape.x += dx;
+          shape.y += dy;
+        } else {
+          shape.cx += dx;
+          shape.cy += dy;
+        }
+
+        dragStartRef.current = { x, y };
+      }
 
       const tool = activeToolRef.current;
       const previewShape = isPlacingRef.current
@@ -112,6 +190,7 @@ export default function Canvas() {
         camera: cameraRef.current,
         shapes: shapesRef.current,
         preview: previewShape,
+        selectedShape: selectedShapeRef.current,
       });
     };
 
@@ -152,11 +231,15 @@ export default function Canvas() {
         canvas,
         camera: cameraRef.current,
         shapes: shapesRef.current,
+        selectedShape: selectedShapeRef.current,
       });
     };
 
     const onMouseUp = (e: MouseEvent) => {
       isPanningRef.current = false;
+      isDraggingRef.current = false;
+      isResizingRef.current = false;
+      resizeHandleRef.current = null;
     };
 
     resize();
