@@ -9,6 +9,7 @@ import {
   signupController,
 } from "../controllers/authController";
 import { userAuth } from "../middleware/userAuth";
+import { googleAuthController } from "../controllers/googleAuthController";
 const authRouter = express.Router();
 
 authRouter.post("/signup", signupController);
@@ -24,4 +25,6 @@ authRouter.post("/resetpassword", resetPasswordController);
 authRouter.post("/refresh", refreshController);
 
 authRouter.get("/me", userAuth, meController);
+
+authRouter.post("/google", googleAuthController);
 export default authRouter;

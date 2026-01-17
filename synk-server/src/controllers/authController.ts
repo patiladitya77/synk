@@ -18,24 +18,44 @@ export const signupController = async (req: Request, res: Response) => {
 
     //  Transaction: user + auth provider
     const user = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          name,
-          emailId,
+      let user = await tx.user.findUnique({
+        where: { emailId },
+      });
+
+      if (!user) {
+        user = await tx.user.create({
+          data: {
+            name,
+            emailId,
+          },
+        });
+      }
+
+      const existingPasswordProvider = await tx.authProvider.findUnique({
+        where: {
+          userId_provider: {
+            userId: user.id,
+            provider: "password",
+          },
         },
       });
+
+      if (existingPasswordProvider) {
+        throw new Error("PASSWORD_ALREADY_SET");
+      }
 
       await tx.authProvider.create({
         data: {
           userId: user.id,
           provider: "password",
-          providerUserId: user.id, // internal mapping
+          providerUserId: user.id,
           passwordHash,
         },
       });
 
       return user;
     });
+
     const refreshToken = generateRefreshToken();
 
     await prisma.session.create({
@@ -68,10 +88,18 @@ export const signupController = async (req: Request, res: Response) => {
       },
     });
   } catch (err: any) {
-    console.error("Signup error:", err);
-    if (err.code === "P2002") {
-      return res.status(409).json({ message: "Email already registered" });
+    if (err.message === "PASSWORD_ALREADY_SET") {
+      return res.status(409).json({
+        message: "Password already set. Please login instead.",
+      });
     }
+
+    if (err.code === "P2002") {
+      return res.status(409).json({
+        message: "Email already registered",
+      });
+    }
+
     return res.status(400).json({ message: "Signup failed" });
   }
 };
@@ -106,7 +134,7 @@ export const loginController = async (req: Request, res: Response) => {
     /*  Verify password */
     const isValidPassword = await bcrypt.compare(
       password,
-      passwordProvider.passwordHash
+      passwordProvider.passwordHash,
     );
 
     if (!isValidPassword) {
