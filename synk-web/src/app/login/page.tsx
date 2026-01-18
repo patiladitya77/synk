@@ -27,11 +27,11 @@ import {
 import { useDispatch } from "react-redux";
 import {
   authenticateUser,
+  authenticateWithGoogle,
   resetPassword,
   sendOtp,
 } from "@/services/authService";
 import { GoogleLogin } from "@react-oauth/google";
-import { addUser, setAccessToken } from "@/utils/userSlice";
 
 enum AuthStep {
   LOGIN = "login",
@@ -257,24 +257,18 @@ export default function Login() {
                   width="100%"
                   onSuccess={async (credentialResponse) => {
                     try {
-                      const res = await axios.post(
-                        `${process.env.NEXT_PUBLIC_API_BASE_URL}api/auth/google`,
-                        { idToken: credentialResponse.credential },
-                        { withCredentials: true },
+                      await authenticateWithGoogle(
+                        credentialResponse.credential!,
+                        dispatch,
                       );
-
-                      dispatch(setAccessToken(res.data.accessToken));
-                      dispatch(addUser(res.data.user));
 
                       showToast("Logged in with Google", "success");
                       router.push("/dashboard");
-                    } catch (error) {
-                      showToast("Google login failed", "error");
+                    } catch {
+                      showToast("Google signup failed", "error");
                     }
                   }}
-                  onError={() => {
-                    showToast("Google login failed", "error");
-                  }}
+                  onError={() => showToast("Google signup failed", "error")}
                 />
               </div>
             </>

@@ -13,14 +13,15 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { getErrorMessage } from "@/lib/getErrorMessage";
-import { authenticateUser } from "@/services/authService";
+import {
+  authenticateUser,
+  authenticateWithGoogle,
+} from "@/services/authService";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useState } from "react";
 import { useDispatch } from "react-redux";
 import { GoogleLogin } from "@react-oauth/google";
-import axios from "axios";
-import { setAccessToken, addUser } from "@/utils/userSlice";
 
 export default function Signup() {
   const [name, setName] = useState("");
@@ -126,24 +127,18 @@ export default function Signup() {
               width="100%"
               onSuccess={async (credentialResponse) => {
                 try {
-                  const res = await axios.post(
-                    `${process.env.NEXT_PUBLIC_API_BASE_URL}api/auth/google`,
-                    { idToken: credentialResponse.credential },
-                    { withCredentials: true },
+                  await authenticateWithGoogle(
+                    credentialResponse.credential!,
+                    dispatch,
                   );
-
-                  dispatch(setAccessToken(res.data.accessToken));
-                  dispatch(addUser(res.data.user));
 
                   showToast("Signed up with Google", "success");
                   router.push("/dashboard");
-                } catch (err) {
+                } catch {
                   showToast("Google signup failed", "error");
                 }
               }}
-              onError={() => {
-                showToast("Google signup failed", "error");
-              }}
+              onError={() => showToast("Google signup failed", "error")}
             />
           </div>
         </CardFooter>
