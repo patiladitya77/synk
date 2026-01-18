@@ -27,41 +27,39 @@ export const googleAuthController = async (req: Request, res: Response) => {
     const { sub: googleUserId, email, name, picture } = payload;
 
     //  Upsert user + provider in transaction
-    const user = await prisma.$transaction(async (tx) => {
-      let user = await tx.user.findUnique({
-        where: { emailId: email },
+
+    let user = await prisma.user.findUnique({
+      where: { emailId: email },
+    });
+
+    if (!user) {
+      user = await prisma.user.create({
+        data: {
+          emailId: email,
+          name: name || "Google User",
+          avatarUrl: picture,
+        },
       });
+    }
 
-      if (!user) {
-        user = await tx.user.create({
-          data: {
-            emailId: email,
-            name: name || "Google User",
-            avatarUrl: picture,
-          },
-        });
-      }
-
-      //  Link Google provider if not exists
-      await tx.authProvider.upsert({
-        where: {
-          userId_provider: {
-            userId: user.id,
-            provider: "google",
-          },
-        },
-        update: {
-          providerUserId: googleUserId,
-        },
-        create: {
+    //  Link Google provider if not exists
+    await prisma.authProvider.upsert({
+      where: {
+        userId_provider: {
           userId: user.id,
           provider: "google",
-          providerUserId: googleUserId,
         },
-      });
-
-      return user;
+      },
+      update: {
+        providerUserId: googleUserId,
+      },
+      create: {
+        userId: user.id,
+        provider: "google",
+        providerUserId: googleUserId,
+      },
     });
+
     const activeSessionCount = await prisma.session.count({
       where: {
         userId: user.id,
@@ -100,7 +98,7 @@ export const googleAuthController = async (req: Request, res: Response) => {
     res.cookie("refreshToken", refreshToken, {
       httpOnly: true,
       secure: process.env.NODE_ENV === "production",
-      sameSite: process.env.NODE_ENV === "production" ? "strict" : "lax",
+      sameSite: "lax",
       maxAge: 7 * 24 * 60 * 60 * 1000,
     });
 
