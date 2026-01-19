@@ -18,24 +18,44 @@ export const signupController = async (req: Request, res: Response) => {
 
     //  Transaction: user + auth provider
     const user = await prisma.$transaction(async (tx) => {
-      const user = await tx.user.create({
-        data: {
-          name,
-          emailId,
+      let user = await tx.user.findUnique({
+        where: { emailId },
+      });
+
+      if (!user) {
+        user = await tx.user.create({
+          data: {
+            name,
+            emailId,
+          },
+        });
+      }
+
+      const existingPasswordProvider = await tx.authProvider.findUnique({
+        where: {
+          userId_provider: {
+            userId: user.id,
+            provider: "password",
+          },
         },
       });
+
+      if (existingPasswordProvider) {
+        throw new Error("PASSWORD_ALREADY_SET");
+      }
 
       await tx.authProvider.create({
         data: {
           userId: user.id,
           provider: "password",
-          providerUserId: user.id, // internal mapping
+          providerUserId: user.id,
           passwordHash,
         },
       });
 
       return user;
     });
+
     const refreshToken = generateRefreshToken();
 
     await prisma.session.create({
@@ -68,10 +88,18 @@ export const signupController = async (req: Request, res: Response) => {
       },
     });
   } catch (err: any) {
-    console.error("Signup error:", err);
-    if (err.code === "P2002") {
-      return res.status(409).json({ message: "Email already registered" });
+    if (err.message === "PASSWORD_ALREADY_SET") {
+      return res.status(409).json({
+        message: "Password already set. Please login instead.",
+      });
     }
+
+    if (err.code === "P2002") {
+      return res.status(409).json({
+        message: "Email already registered",
+      });
+    }
+
     return res.status(400).json({ message: "Signup failed" });
   }
 };
@@ -106,23 +134,12 @@ export const loginController = async (req: Request, res: Response) => {
     /*  Verify password */
     const isValidPassword = await bcrypt.compare(
       password,
-      passwordProvider.passwordHash
+      passwordProvider.passwordHash,
     );
 
     if (!isValidPassword) {
       return res.status(401).json({ message: "Invalid credentials" });
     }
-
-    /* Revoke existing sessions  */
-    await prisma.session.updateMany({
-      where: {
-        userId: user.id,
-        revokedAt: null,
-      },
-      data: {
-        revokedAt: new Date(),
-      },
-    });
 
     /* Enforce session limit */
     const activeSessionCount = await prisma.session.count({
@@ -137,6 +154,16 @@ export const loginController = async (req: Request, res: Response) => {
         message: "Too many active sessions",
       });
     }
+    /* Revoke existing sessions  */
+    await prisma.session.updateMany({
+      where: {
+        userId: user.id,
+        revokedAt: null,
+      },
+      data: {
+        revokedAt: new Date(),
+      },
+    });
 
     /*  Create new session */
     const refreshToken = generateRefreshToken();
@@ -153,6 +180,12 @@ export const loginController = async (req: Request, res: Response) => {
 
     /* Generate access token */
     const accessToken = generateAccessToken(user.id);
+
+    // update last login
+    await prisma.user.update({
+      where: { id: user.id },
+      data: { lastLoginAt: new Date() },
+    });
 
     /* Set refresh token cookie */
     res.cookie("refreshToken", refreshToken, {
@@ -297,28 +330,34 @@ export const resetPasswordController = async (req: Request, res: Response) => {
     }
 
     const passwordHash = await bcrypt.hash(newPassword, 10);
-    await prisma.$transaction([
-      prisma.authProvider.update({
+    await prisma.$transaction(async (tx) => {
+      await tx.authProvider.upsert({
         where: {
           userId_provider: {
             userId: user.id,
             provider: "password",
           },
         },
-        data: {
+        update: {
           passwordHash,
         },
-      }),
+        create: {
+          userId: user.id,
+          provider: "password",
+          providerUserId: user.id,
+          passwordHash,
+        },
+      });
 
-      prisma.user.update({
+      await tx.user.update({
         where: { id: user.id },
         data: {
           resetOtp: null,
           resetOtpExpiry: null,
           otpAttempts: 0,
         },
-      }),
-    ]);
+      });
+    });
 
     res.json({ message: "Password reset successful" });
   } catch (err) {

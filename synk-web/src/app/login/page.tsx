@@ -27,9 +27,11 @@ import {
 import { useDispatch } from "react-redux";
 import {
   authenticateUser,
+  authenticateWithGoogle,
   resetPassword,
   sendOtp,
 } from "@/services/authService";
+import { GoogleLogin } from "@react-oauth/google";
 
 enum AuthStep {
   LOGIN = "login",
@@ -58,7 +60,7 @@ export default function Login() {
       await authenticateUser(
         "login",
         { emailId: email, password: password },
-        dispatch
+        dispatch,
       );
 
       showToast("Welcome back!", "success");
@@ -250,9 +252,25 @@ export default function Login() {
               <Button className="w-full" onClick={handleLogin}>
                 Login
               </Button>
-              <Button variant="outline" className="w-full">
-                Login with Google
-              </Button>
+              <div className="w-full flex justify-center">
+                <GoogleLogin
+                  width="100%"
+                  onSuccess={async (credentialResponse) => {
+                    try {
+                      await authenticateWithGoogle(
+                        credentialResponse.credential!,
+                        dispatch,
+                      );
+
+                      showToast("Logged in with Google", "success");
+                      router.push("/dashboard");
+                    } catch {
+                      showToast("Google signup failed", "error");
+                    }
+                  }}
+                  onError={() => showToast("Google signup failed", "error")}
+                />
+              </div>
             </>
           )}
 
