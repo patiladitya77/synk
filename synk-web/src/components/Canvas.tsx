@@ -28,6 +28,11 @@ export default function Canvas() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const shapesRef = useRef<Shape[]>([]);
+  function setCursor(cursor: string) {
+    if (canvasRef.current) {
+      canvasRef.current.style.cursor = cursor;
+    }
+  }
 
   function hitTest(shape: Shape, x: number, y: number) {
     if (shape.type === "rect") {
@@ -99,6 +104,11 @@ export default function Canvas() {
 
       for (let i = shapesRef.current.length - 1; i >= 0; i--) {
         const shape = shapesRef.current[i];
+        selectedShapeRef.current = shape;
+        isDraggingRef.current = true;
+        dragStartRef.current = { x, y };
+        setCursor("grabbing");
+
         if (hitTest(shape, x, y)) {
           selectedShapeRef.current = shape;
           isDraggingRef.current = true;
@@ -162,6 +172,26 @@ export default function Canvas() {
       }
 
       const { x, y } = getWorldPos(e);
+      let hoveringShape = false;
+
+      // hover detection
+      for (let i = shapesRef.current.length - 1; i >= 0; i--) {
+        const shape = shapesRef.current[i];
+        if (hitTest(shape, x, y)) {
+          hoveringShape = true;
+          break;
+        }
+      }
+      if (isPanningRef.current) {
+        setCursor("move");
+      } else if (isDraggingRef.current) {
+        setCursor("grabbing");
+      } else if (hoveringShape) {
+        setCursor("grab");
+      } else {
+        setCursor("default");
+      }
+
       if (isDraggingRef.current && selectedShapeRef.current) {
         const dx = x - dragStartRef.current.x;
         const dy = y - dragStartRef.current.y;
@@ -181,7 +211,7 @@ export default function Canvas() {
 
       const tool = activeToolRef.current;
       const previewShape = isPlacingRef.current
-        ? tool.getPreview?.({ x, y }) ?? undefined
+        ? (tool.getPreview?.({ x, y }) ?? undefined)
         : undefined;
 
       render({
@@ -240,6 +270,7 @@ export default function Canvas() {
       isDraggingRef.current = false;
       isResizingRef.current = false;
       resizeHandleRef.current = null;
+      setCursor("default");
     };
 
     resize();
