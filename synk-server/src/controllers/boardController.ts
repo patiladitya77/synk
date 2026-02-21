@@ -159,3 +159,47 @@ export const generateInviteLinkController = async (
     });
   }
 };
+
+export const acceptInviteController = async (req: Request, res: Response) => {
+  try {
+    console.log("control reached");
+    const { token } = req.params;
+    console.log("token: ", token);
+    const user = req.user;
+    if (!user) {
+      return res.json("User does not exixts");
+    }
+    console.log("user: ", user);
+    const board = await prisma.board.findFirst({
+      where: {
+        inviteToken: token,
+        isInviteEnabled: true,
+        inviteTokenExpiresAt: {
+          gt: new Date(),
+        },
+      },
+    });
+    console.log("query one sucess");
+    if (!board) {
+      return res.status(400).json("Invalid or expired invite link");
+    }
+    await prisma.boardCollaborator.upsert({
+      where: {
+        boardId_userId: {
+          boardId: board.id,
+          userId: user.id,
+        },
+      },
+      update: {},
+      create: {
+        boardId: board.id,
+        userId: user.id,
+        role: "EDITOR",
+      },
+    });
+    console.log("accept invite api ran successfully");
+    res.json({ message: "Invite accepted successfully", boardId: board.slug });
+  } catch (error) {
+    return res.status(500).json({ error: "Something went wrong" });
+  }
+};

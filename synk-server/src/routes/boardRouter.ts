@@ -1,5 +1,6 @@
 import express from "express";
 import {
+  acceptInviteController,
   checkName,
   createBoardController,
   generateInviteLinkController,
@@ -16,5 +17,6 @@ boardRouter.post(
   userAuth,
   generateInviteLinkController,
 );
+boardRouter.post("/invite/:token", userAuth, acceptInviteController);
 
 export default boardRouter;
