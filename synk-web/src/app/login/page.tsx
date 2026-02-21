@@ -16,7 +16,7 @@ import { Label } from "@/components/ui/label";
 import Link from "next/link";
 import { useState } from "react";
 import axios from "axios";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 
 import {
   InputOTP,
@@ -41,6 +41,8 @@ enum AuthStep {
 }
 
 export default function Login() {
+  const searchParams = useSearchParams();
+  const inviteToken = searchParams.get("invite");
   const { showToast } = useGlobalToast();
   const [step, setStep] = useState<AuthStep>(AuthStep.LOGIN);
   const [email, setEmail] = useState("");
@@ -57,14 +59,21 @@ export default function Login() {
       return;
     }
     try {
-      await authenticateUser(
+      const res = await authenticateUser(
         "login",
         { emailId: email, password: password },
         dispatch,
+        inviteToken || undefined,
       );
+      console.log(res);
 
       showToast("Welcome back!", "success");
-      router.push("/dashboard");
+      if (res && "inviteSlug" in res && res.inviteSlug) {
+        router.replace(`/workspace/${res.inviteSlug}`);
+        return;
+      }
+
+      router.replace("/dashboard");
     } catch (error) {
       if (axios.isAxiosError(error) && error.response?.status === 401) {
         showToast("Invalid email or password", "error");
@@ -257,13 +266,18 @@ export default function Login() {
                   width="100%"
                   onSuccess={async (credentialResponse) => {
                     try {
-                      await authenticateWithGoogle(
+                      const res = await authenticateWithGoogle(
                         credentialResponse.credential!,
                         dispatch,
+                        inviteToken || undefined,
                       );
 
                       showToast("Logged in with Google", "success");
-                      router.push("/dashboard");
+                      if (res && "inviteSlug" in res && res.inviteSlug) {
+                        router.replace(`/workspace/${res.inviteSlug}`);
+                        return;
+                      }
+                      router.replace("/dashboard");
                     } catch {
                       showToast("Google signup failed", "error");
                     }

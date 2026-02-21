@@ -18,12 +18,14 @@ import {
   authenticateWithGoogle,
 } from "@/services/authService";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { useState } from "react";
 import { useDispatch } from "react-redux";
 import { GoogleLogin } from "@react-oauth/google";
 
 export default function Signup() {
+  const searchParams = useSearchParams();
+  const inviteToken = searchParams.get("invite");
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -42,14 +44,19 @@ export default function Signup() {
       return;
     }
     try {
-      await authenticateUser(
+      const res = await authenticateUser(
         "signup",
         { name, emailId: email, password: password },
         dispatch,
+        inviteToken || undefined,
       );
 
       showToast("Account created successfully", "success");
-      router.push("/dashboard");
+      if (res && "inviteSlug" in res && res.inviteSlug) {
+        router.replace(`/workspace/${res.inviteSlug}`);
+        return;
+      }
+      router.replace("/dashboard");
     } catch (error) {
       console.log(error);
       const message = getErrorMessage(error);
