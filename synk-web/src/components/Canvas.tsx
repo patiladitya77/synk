@@ -6,6 +6,10 @@ import { TOOLS } from "@/canvas-engine/tools";
 import { render } from "@/canvas-engine/renderer";
 import { Shape } from "@/canvas-engine/types";
 import { pan, zoomAt } from "@/canvas-engine/camera";
+import { createSocketConnection } from "@/utils/socket";
+import { useSelector } from "react-redux";
+import { RootState } from "@/utils/appStore";
+import { useParams } from "next/navigation";
 
 export default function Canvas() {
   const selectedShapeRef = useRef<Shape | null>(null);
@@ -13,6 +17,17 @@ export default function Canvas() {
   const isResizingRef = useRef(false);
   const resizeHandleRef = useRef<"tl" | "tr" | "bl" | "br" | null>(null);
   const dragStartRef = useRef({ x: 0, y: 0 });
+  const user = useSelector((store: RootState) => store.user.user);
+  const params = useParams() as { slug?: string | string[] };
+
+  const boardId =
+    typeof params.slug === "string"
+      ? params.slug
+      : Array.isArray(params.slug)
+        ? params.slug[0]
+        : undefined;
+
+  console.log(user);
 
   const activeToolRef = useRef(TOOLS.rect);
 
@@ -54,6 +69,58 @@ export default function Canvas() {
   }
 
   useEffect(() => {
+    if (!user || !boardId) return;
+
+    const socket = createSocketConnection();
+
+    socket.emit("joinboard", {
+      name: user.name,
+      userId: user.id,
+      boardId,
+    });
+
+    socket.on("initialstate", (serverShapes: Shape[]) => {
+      shapesRef.current = serverShapes;
+
+      render({
+        ctx,
+        canvas,
+        camera: cameraRef.current,
+        shapes: shapesRef.current,
+        selectedShape: selectedShapeRef.current,
+      });
+    });
+
+    socket.on("shapeDrawn", (shape: Shape) => {
+      shapesRef.current.push(shape);
+
+      render({
+        ctx,
+        canvas,
+        camera: cameraRef.current,
+        shapes: shapesRef.current,
+        selectedShape: selectedShapeRef.current,
+      });
+    });
+
+    socket.on("shapeUpdated", (updatedShape: Shape) => {
+      const index = shapesRef.current.findIndex(
+        (s) => s.id === updatedShape.id,
+      );
+
+      if (index !== -1) {
+        shapesRef.current[index] = updatedShape;
+      }
+
+      render({
+        ctx,
+        canvas,
+        camera: cameraRef.current,
+        shapes: shapesRef.current,
+        selectedShape: selectedShapeRef.current,
+      });
+    });
+
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
     const DPR = window.devicePixelRatio || 1;
@@ -147,6 +214,10 @@ export default function Canvas() {
 
         if (shape) {
           shapesRef.current.push(shape);
+          socket.emit("drawShape", {
+            boardId,
+            shape,
+          });
         }
 
         isPlacingRef.current = false;
@@ -266,6 +337,12 @@ export default function Canvas() {
     };
 
     const onMouseUp = (e: MouseEvent) => {
+      if (selectedShapeRef.current) {
+        socket.emit("updateShape", {
+          boardId,
+          shape: selectedShapeRef.current,
+        });
+      }
       isPanningRef.current = false;
       isDraggingRef.current = false;
       isResizingRef.current = false;
@@ -286,8 +363,9 @@ export default function Canvas() {
       canvas.removeEventListener("mousemove", onMouseMove);
       canvas.removeEventListener("mouseup", onMouseUp);
       canvas.removeEventListener("wheel", onWheel);
+      // socket.disconnect();
     };
-  }, []);
+  }, [user, boardId]);
 
   return (
     <>
