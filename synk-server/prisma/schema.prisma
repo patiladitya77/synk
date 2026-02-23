@@ -40,11 +40,11 @@ model Board {
   inviteToken     String?
   isInviteEnabled Boolean @default(true)
   inviteTokenExpiresAt DateTime?
-  content         Json?
   ownerId         String  @db.Uuid
   owner           User    @relation("BoardOwner", fields: [ownerId], references: [id])
 
   collaborators BoardCollaborator[]
+  shapes          Shape[]
 
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
@@ -65,6 +65,21 @@ model BoardCollaborator {
 
   @@unique([boardId, userId])
   @@index([userId])
+  @@index([boardId])
+}
+
+model Shape {
+  id        String   @id @default(uuid()) @db.Uuid
+  boardId   String   @db.Uuid
+  type      String
+  data      Json
+  version   Int      @default(1)
+
+  board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
   @@index([boardId])
 }
 
