@@ -68,8 +68,8 @@ export const authenticateWithGoogle = async (
 
     if (inviteToken) {
       const inviteRes = await api.post(
-        `${base_url}api/invitations/accept`,
-        { token: inviteToken },
+        `${base_url}api/board/invite/${inviteToken}`,
+        {},
         { withCredentials: true },
       );
 
