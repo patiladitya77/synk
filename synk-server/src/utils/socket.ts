@@ -1,6 +1,7 @@
 import { createHash } from "node:crypto";
 import { Server } from "socket.io";
 import { Shape } from "../types/shapes";
+import { prisma } from "../lib/prisma";
 
 const getBoardRoomId = (boardId: string) => {
   return createHash("sha256").update(boardId).digest("hex");
@@ -11,25 +12,45 @@ const initialiseSocket = (server: any) => {
     cors: { origin: process.env.ORIGIN_URL },
   });
   io.on("connection", (socket) => {
-    socket.on("joinboard", ({ name, userId, boardId }) => {
-      const roomId = getBoardRoomId(boardId);
+    socket.on("joinboard", async ({ name, userId, boardId: slug }) => {
+      const board = await prisma.board.findFirst({ where: { slug } });
+      if (!board) {
+        socket.emit("error", "Board not found");
+        return;
+      }
+
+      const roomId = getBoardRoomId(board.id);
+
       socket.join(roomId);
+      const shapes = await prisma.shape.findMany({
+        where: { boardId: board.id },
+      });
       console.log("name: ", name);
-      console.log("boardId: ", boardId);
-      socket.emit("initialstate", boardState[roomId] || []);
+      console.log("boardId: ", board.id);
+      socket.emit(
+        "initialstate",
+        shapes.map((s) => s.data),
+      );
     });
 
     // Draw shape
     socket.on(
       "drawShape",
-      ({ boardId, shape }: { boardId: string; shape: Shape }) => {
-        const roomId = getBoardRoomId(boardId);
-
-        if (!boardState[roomId]) {
-          boardState[roomId] = [];
+      async ({ boardId: slug, shape }: { boardId: string; shape: Shape }) => {
+        const board = await prisma.board.findFirst({ where: { slug } });
+        if (!board) {
+          socket.emit("error", "boardnot found");
+          return;
         }
-
-        boardState[roomId].push(shape);
+        const roomId = getBoardRoomId(board.id);
+        await prisma.shape.create({
+          data: {
+            id: shape.id,
+            boardId: board.id,
+            type: shape.type,
+            data: shape,
+          },
+        });
 
         // Broadcast to others
         socket.to(roomId).emit("shapeDrawn", shape);
@@ -39,26 +60,33 @@ const initialiseSocket = (server: any) => {
     // Update shape
     socket.on(
       "updateShape",
-      ({ boardId, shape }: { boardId: string; shape: Shape }) => {
-        const roomId = getBoardRoomId(boardId);
-
-        const shapes = boardState[roomId];
-        if (!shapes) return;
-
-        const index = shapes.findIndex((s) => s.id === shape.id);
-        if (index !== -1) {
-          shapes[index] = shape;
+      async ({ boardId: slug, shape }: { boardId: string; shape: Shape }) => {
+        const board = await prisma.board.findFirst({ where: { slug } });
+        if (!board) {
+          socket.emit("error", "board not found");
+          return;
         }
+        const roomId = getBoardRoomId(board.id);
+
+        await prisma.shape.update({
+          where: { id: shape.id },
+          data: {
+            data: shape,
+            version: { increment: 1 },
+          },
+        });
 
         socket.to(roomId).emit("shapeUpdated", shape);
       },
     );
 
     // Clear board
-    socket.on("clearBoard", ({ boardId }) => {
+    socket.on("clearBoard", async ({ boardId }) => {
       const roomId = getBoardRoomId(boardId);
 
-      boardState[roomId] = [];
+      await prisma.shape.deleteMany({
+        where: { boardId },
+      });
       io.to(roomId).emit("boardCleared");
     });
 
