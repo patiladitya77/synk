@@ -54,6 +54,7 @@ const initialiseSocket = (server: any) => {
 
         // Broadcast to others
         socket.to(roomId).emit("shapeDrawn", shape);
+        console.log("shape: ", shape);
       },
     );
 

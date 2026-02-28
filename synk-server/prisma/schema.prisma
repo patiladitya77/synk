@@ -117,6 +117,15 @@ model Session {
 
   @@index([userId])
 }
+model BoardOperation {
+  id        String   @id @default(uuid())
+  boardId   String
+  type      String
+  payload   Json
+  createdAt DateTime @default(now())
+
+  @@index([boardId])
+}
 
 enum BoardRole {
   VIEWER
