@@ -22,16 +22,20 @@ import { Dialog, DialogTrigger } from "@/components/ui/dialog";
 import { MoreHorizontal } from "lucide-react";
 import ShareDialog from "./ShareDialog";
 import { RootState } from "@/utils/appStore";
+import { ICanvas } from "@/types/canvas";
+
 const UserCanvases = () => {
   const user = useSelector((store: RootState) => store.user.user);
   const router = useRouter();
-  const { canvases, loading } = useGetUserCanvases();
+  const { loading } = useGetUserCanvases();
+  const canvases = useSelector((store: RootState) => store.canvas.canvases);
+
   if (loading) return <TableSkeleton rows={6} />;
 
   return (
     <Table className="text-base">
       <TableHeader>
-        {canvases.length === 0 && !loading ? (
+        {(!canvases || canvases.length === 0) && !loading ? (
           <TableRow>
             <TableCell
               colSpan={4}
@@ -51,7 +55,7 @@ const UserCanvases = () => {
       </TableHeader>
 
       <TableBody>
-        {canvases.map((canvas) => (
+        {canvases?.map((canvas: ICanvas) => (
           <TableRow key={canvas.id} className="cursor-pointer hover:bg-muted">
             <TableCell
               className="py-3 font-medium"

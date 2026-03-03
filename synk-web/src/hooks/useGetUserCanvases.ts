@@ -1,14 +1,13 @@
-import { ICanvas } from "@/types/canvas";
 import api from "@/utils/axiosInterceptor";
-import axios from "axios";
+import { setUserCanvases } from "@/utils/canvasSlice";
 import { useEffect, useState } from "react";
-import { useSelector } from "react-redux";
+import { useDispatch, useSelector } from "react-redux";
 
 const useGetUserCanvases = () => {
-  const [canvases, setCanvases] = useState<ICanvas[]>([]);
   const [loading, setLoading] = useState(true);
+  const dispatch = useDispatch();
   const { authLoading, isAuthenticated } = useSelector(
-    (state: any) => state.user
+    (state: any) => state.user,
   );
   useEffect(() => {
     //  Wait until auth check finishes
@@ -24,8 +23,7 @@ const useGetUserCanvases = () => {
         const res = await api.get("api/board/getboards", {
           withCredentials: true,
         });
-        console.log(res);
-        setCanvases(res.data.boards);
+        dispatch(setUserCanvases(res.data.boards));
       } catch (error) {
         console.log(error);
       } finally {
@@ -34,6 +32,6 @@ const useGetUserCanvases = () => {
     };
     getCanvases();
   }, [authLoading, isAuthenticated]);
-  return { canvases, loading };
+  return { loading };
 };
 export default useGetUserCanvases;
