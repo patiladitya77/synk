@@ -1,6 +1,7 @@
 import { Shape } from "./types";
-import { drawBackground, drawShape } from "./draw";
+import { drawBackground } from "./draw";
 import { drawGrid } from "./grid";
+import { shapeRegistry } from "./shapes/shapeRegistery";
 
 export function render({
   ctx,
@@ -26,53 +27,25 @@ export function render({
   ctx.translate(camera.x, camera.y);
   ctx.scale(camera.zoom, camera.zoom);
 
-  shapes.forEach((s) => drawShape(ctx, s));
+  shapes.forEach((shape) => {
+    const renderer = shapeRegistry[shape.type];
+    renderer?.draw(ctx, shape);
+  });
 
   if (preview) {
     ctx.globalAlpha = 0.4;
-    drawShape(ctx, preview);
+    shapeRegistry[preview.type]?.draw(ctx, preview);
     ctx.globalAlpha = 1;
   }
 
   if (selectedShape) {
+    const renderer = shapeRegistry[selectedShape.type];
     ctx.save();
     ctx.strokeStyle = "#60a5fa";
     ctx.lineWidth = 1 / camera.zoom;
     ctx.setLineDash([6 / camera.zoom]);
 
-    if (selectedShape.type === "rect") {
-      const { x, y, width, height } = selectedShape;
-
-      ctx.strokeRect(x, y, width, height);
-
-      const HANDLE_SIZE = 8 / camera.zoom;
-      ctx.fillStyle = "#60a5fa";
-
-      const drawHandle = (hx: number, hy: number) => {
-        ctx.fillRect(
-          hx - HANDLE_SIZE / 2,
-          hy - HANDLE_SIZE / 2,
-          HANDLE_SIZE,
-          HANDLE_SIZE
-        );
-      };
-
-      drawHandle(x, y);
-      drawHandle(x + width, y);
-      drawHandle(x, y + height);
-      drawHandle(x + width, y + height);
-    }
-    if (selectedShape.type === "circle") {
-      ctx.beginPath();
-      ctx.arc(
-        selectedShape.cx,
-        selectedShape.cy,
-        selectedShape.r,
-        0,
-        Math.PI * 2
-      );
-      ctx.stroke();
-    }
+    renderer?.drawSelection?.(ctx, selectedShape, camera.zoom);
 
     ctx.restore();
   }
