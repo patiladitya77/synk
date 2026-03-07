@@ -213,7 +213,7 @@ export default function Canvas() {
         const shape = tool.onPointerDown?.({ x, y });
 
         if (shape) {
-          shapesRef.current.push(shape);
+          // Don't add to local state yet - wait for server response
           socket.emit("drawShape", {
             boardId,
             shape,
@@ -337,7 +337,7 @@ export default function Canvas() {
     };
 
     const onMouseUp = (e: MouseEvent) => {
-      if (selectedShapeRef.current) {
+      if (selectedShapeRef.current && selectedShapeRef.current.id) {
         socket.emit("updateShape", {
           boardId,
           shape: selectedShapeRef.current,

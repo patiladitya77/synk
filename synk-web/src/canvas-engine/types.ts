@@ -5,14 +5,14 @@ export type Shape =
       y: number;
       width: number;
       height: number;
-      id: number;
+      id: string;
     }
   | {
       type: "circle";
       cx: number;
       cy: number;
       r: number;
-      id: number;
+      id: string;
     };
 
 export type Camera = {

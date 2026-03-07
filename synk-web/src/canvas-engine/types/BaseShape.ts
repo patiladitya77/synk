@@ -1,5 +1,5 @@
 export interface BaseShape {
-  id: number;
+  id: string;
   type: string;
   fill?: string;
   stroke?: string;

@@ -4,6 +4,7 @@ export const CircleTool: ToolHandler = {
   onPointerDown(pos) {
     return {
       type: "circle",
+      id: "", // Will be set by the server
       cx: pos.x,
       cy: pos.y,
       r: 40,
@@ -13,6 +14,7 @@ export const CircleTool: ToolHandler = {
   getPreview(pos) {
     return {
       type: "circle",
+      id: "preview",
       cx: pos.x,
       cy: pos.y,
       r: 40,

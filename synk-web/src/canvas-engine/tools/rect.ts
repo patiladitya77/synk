@@ -5,6 +5,7 @@ export const RectTool: ToolHandler = {
   onPointerDown(pos) {
     return {
       type: "rect",
+      id: "", // Will be set by the server
       x: pos.x - 50,
       y: pos.y - 30,
       width: 100,
@@ -15,6 +16,7 @@ export const RectTool: ToolHandler = {
   getPreview(pos) {
     return {
       type: "rect",
+      id: "preview",
       x: pos.x - 50,
       y: pos.y - 30,
       width: 100,
