@@ -213,10 +213,12 @@ export default function Canvas() {
         const shape = tool.onPointerDown?.({ x, y });
 
         if (shape) {
+          console.log("userId from shape: ", user.id);
           // Don't add to local state yet - wait for server response
           socket.emit("drawShape", {
             boardId,
             shape,
+            userId: user.id,
           });
         }
 

@@ -74,6 +74,10 @@ model Shape {
   type      String
   data      Json
   version   Int      @default(1)
+  createdBy String   @db.Uuid
+  updatedBy String?  @db.Uuid
+
+  isDeleted Boolean  @default(false)
 
   board     Board    @relation(fields: [boardId], references: [id], onDelete: Cascade)
 

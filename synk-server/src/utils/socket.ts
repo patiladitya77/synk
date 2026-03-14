@@ -38,13 +38,22 @@ const initialiseSocket = (server: any) => {
     // Draw shape
     socket.on(
       "drawShape",
-      async ({ boardId: slug, shape }: { boardId: string; shape: Shape }) => {
+      async ({
+        boardId: slug,
+        shape,
+        userId,
+      }: {
+        boardId: string;
+        shape: Shape;
+        userId: string;
+      }) => {
         const board = await prisma.board.findFirst({ where: { slug } });
         if (!board) {
           socket.emit("error", "boardnot found");
           return;
         }
         const roomId = getBoardRoomId(board.id);
+        console.log("userId from drawshape:", userId);
 
         // Let Prisma auto-generate the UUID
         const createdShape = await prisma.shape.create({
@@ -52,6 +61,7 @@ const initialiseSocket = (server: any) => {
             boardId: board.id,
             type: shape.type,
             data: shape,
+            createdBy: userId,
           },
         });
 
@@ -62,7 +72,7 @@ const initialiseSocket = (server: any) => {
         socket.to(roomId).emit("shapeDrawn", shapeWithId);
         // Also send back to the creator
         socket.emit("shapeDrawn", shapeWithId);
-        console.log("shape: ", shapeWithId);
+        console.log("created shape: ", createdShape);
       },
     );
 
