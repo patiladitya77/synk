@@ -1,7 +1,7 @@
 import React from "react";
-import { Command } from "./command";
 import { Shape } from "../types";
 import { Socket } from "socket.io-client";
+import { Command } from "./Command";
 
 export class AddShapeCommand implements Command {
   private committedShape: Shape | null = null; // will hold the server-assigned id
@@ -10,6 +10,7 @@ export class AddShapeCommand implements Command {
     private boardId: string,
     private socket: Socket,
     private shape: Shape,
+    private userId: string,
   ) {
     // Listen for the server's response and capture the real id
     this.socket.once("shapeDrawn", (serverShape: Shape) => {
@@ -20,9 +21,10 @@ export class AddShapeCommand implements Command {
     });
   }
   execute(): void {
+    console.log(this.shape);
     this.socket.emit("drawShape", {
+      userId: this.userId,
       boardId: this.boardId,
-      userId: this.shape.userId,
       shape: this.shape,
     });
   }
@@ -33,7 +35,7 @@ export class AddShapeCommand implements Command {
     );
     this.socket.emit("deleteShape", {
       boardId: this.boardId,
-      shapeId: this.shape.id,
+      shapeId: this.committedShape.id,
     });
   }
 }
