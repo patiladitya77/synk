@@ -53,7 +53,7 @@ const initialiseSocket = (server: any) => {
           return;
         }
         const roomId = getBoardRoomId(board.id);
-        console.log("userId from drawshape:", userId);
+        // console.log("userId from drawshape:", userId);
 
         // Let Prisma auto-generate the UUID
         const createdShape = await prisma.shape.create({
@@ -110,6 +110,24 @@ const initialiseSocket = (server: any) => {
         }
       },
     );
+
+    //delete shape
+    socket.on("deleteShape", async ({ boardId: slug, shapeId }) => {
+      const board = await prisma.board.findFirst({ where: { slug } });
+      if (!board) {
+        socket.emit("error", "board not found");
+        return;
+      }
+      const roomId = getBoardRoomId(board.id);
+      try {
+        await prisma.shape.delete({ where: { id: shapeId } });
+        io.to(roomId).emit("shapeDeleted", { shapeId });
+        console.log("shape deleted");
+      } catch (error) {
+        console.error("Failed to delete shape:", error);
+        socket.emit("error", "Failed to delete shape");
+      }
+    });
 
     // Clear board
     socket.on("clearBoard", async ({ boardId }) => {

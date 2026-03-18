@@ -10,8 +10,16 @@ import { createSocketConnection } from "@/utils/socket";
 import { useSelector } from "react-redux";
 import { RootState } from "@/utils/appStore";
 import { useParams } from "next/navigation";
+import { CommandManager } from "@/canvas-engine/commands/CommandManager";
+import { MoveShapeCommand } from "@/canvas-engine/commands/MoveShapeCommand";
+import { AddShapeCommand } from "@/canvas-engine/commands/AddShapeCommand";
+import { DeleteShapeCommand } from "@/canvas-engine/commands/DeleteShapeCommand";
 
 export default function Canvas() {
+  // Add these refs at the top of Canvas()
+  const commandManagerRef = useRef(new CommandManager());
+  const dragStartShapeSnapshotRef = useRef<Shape | null>(null); // shape state BEFORE drag
+
   const selectedShapeRef = useRef<Shape | null>(null);
   const isDraggingRef = useRef(false);
   const isResizingRef = useRef(false);
@@ -91,6 +99,17 @@ export default function Canvas() {
       });
     });
 
+    socket.on("shapeDeleted", ({ shapeId }: { shapeId: string }) => {
+      shapesRef.current = shapesRef.current.filter((s) => s.id !== shapeId);
+      render({
+        ctx,
+        canvas,
+        camera: cameraRef.current,
+        shapes: shapesRef.current,
+        selectedShape: selectedShapeRef.current,
+      });
+    });
+
     socket.on("shapeDrawn", (shape: Shape) => {
       shapesRef.current.push(shape);
 
@@ -158,6 +177,59 @@ export default function Canvas() {
       };
     };
 
+    const onKeyDown = (e: KeyboardEvent) => {
+      const isMac = navigator.platform.toUpperCase().includes("MAC");
+      const ctrl = isMac ? e.metaKey : e.ctrlKey;
+
+      //delete selectd shape
+      if (
+        (e.key === "Delete" || e.key === "Backspace") &&
+        selectedShapeRef.current
+      ) {
+        const cmd = new DeleteShapeCommand(
+          shapesRef,
+          boardId!,
+          socket,
+          { ...selectedShapeRef.current }, // snapshot before deleting
+          user.id,
+        );
+        commandManagerRef.current.execute(cmd);
+        selectedShapeRef.current = null;
+
+        render({
+          ctx,
+          canvas,
+          camera: cameraRef.current,
+          shapes: shapesRef.current,
+          selectedShape: null,
+        });
+      }
+
+      if (ctrl && e.key === "z" && !e.shiftKey) {
+        e.preventDefault();
+        commandManagerRef.current.undo();
+        render({
+          ctx,
+          canvas,
+          camera: cameraRef.current,
+          shapes: shapesRef.current,
+          selectedShape: selectedShapeRef.current,
+        });
+      }
+
+      if (ctrl && (e.key === "y" || (e.key === "z" && e.shiftKey))) {
+        e.preventDefault();
+        commandManagerRef.current.redo();
+        render({
+          ctx,
+          canvas,
+          camera: cameraRef.current,
+          shapes: shapesRef.current,
+          selectedShape: selectedShapeRef.current,
+        });
+      }
+    };
+
     const onMouseDown = (e: MouseEvent) => {
       const { x, y } = getWorldPos(e);
       if (e.button === 1) {
@@ -180,6 +252,7 @@ export default function Canvas() {
           selectedShapeRef.current = shape;
           isDraggingRef.current = true;
           dragStartRef.current = { x, y };
+          dragStartShapeSnapshotRef.current = { ...shape };
           hitAnyShape = true;
 
           render({
@@ -212,14 +285,16 @@ export default function Canvas() {
 
         const shape = tool.onPointerDown?.({ x, y });
 
+        // In onMouseDown, replace the raw socket.emit with:
         if (shape) {
-          console.log("userId from shape: ", user.id);
-          // Don't add to local state yet - wait for server response
-          socket.emit("drawShape", {
-            boardId,
+          const cmd = new AddShapeCommand(
+            shapesRef,
+            boardId!,
+            socket,
             shape,
-            userId: user.id,
-          });
+            user.id,
+          );
+          commandManagerRef.current.execute(cmd);
         }
 
         isPlacingRef.current = false;
@@ -339,16 +414,55 @@ export default function Canvas() {
     };
 
     const onMouseUp = (e: MouseEvent) => {
-      if (selectedShapeRef.current && selectedShapeRef.current.id) {
-        socket.emit("updateShape", {
-          boardId,
-          shape: selectedShapeRef.current,
-        });
+      if (
+        isDraggingRef.current &&
+        selectedShapeRef.current &&
+        dragStartShapeSnapshotRef.current
+      ) {
+        const before = dragStartShapeSnapshotRef.current;
+        const after = selectedShapeRef.current;
+
+        // Only record if the shape actually moved
+        const didMove =
+          before.type === "rect"
+            ? before.x !== (after as any).x || before.y !== (after as any).y
+            : before.type === "circle"
+              ? (before as any).cx !== (after as any).cx
+              : false;
+
+        if (didMove) {
+          const cmd = new MoveShapeCommand(
+            shapesRef,
+            boardId!,
+            socket,
+            before,
+            { ...after },
+          );
+          // Don't call cmd.execute() — the move already happened visually.
+          // Just push it into history so undo works.
+          // commandManagerRef.current["history"] = [
+          //   ...commandManagerRef.current["history"].slice(
+          //     0,
+          //     commandManagerRef.current["pointer"] + 1,
+          //   ),
+          //   cmd,
+          // ];
+          // commandManagerRef.current["pointer"]++;
+          // // Now sync to server
+          // socket.emit("updateShape", { boardId, shape: after });
+          commandManagerRef.current.record(
+            new MoveShapeCommand(shapesRef, boardId!, socket, before, {
+              ...after,
+            }),
+          );
+          socket.emit("updateShape", { boardId, shape: after });
+        }
       }
+
+      dragStartShapeSnapshotRef.current = null;
       isPanningRef.current = false;
       isDraggingRef.current = false;
       isResizingRef.current = false;
-      resizeHandleRef.current = null;
       setCursor("default");
     };
 
@@ -358,6 +472,7 @@ export default function Canvas() {
     canvas.addEventListener("mousemove", onMouseMove);
     canvas.addEventListener("mouseup", onMouseUp);
     canvas.addEventListener("wheel", onWheel, { passive: false });
+    window.addEventListener("keydown", onKeyDown);
 
     return () => {
       window.removeEventListener("resize", resize);
@@ -365,6 +480,7 @@ export default function Canvas() {
       canvas.removeEventListener("mousemove", onMouseMove);
       canvas.removeEventListener("mouseup", onMouseUp);
       canvas.removeEventListener("wheel", onWheel);
+      window.removeEventListener("keydown", onKeyDown);
       // socket.disconnect();
     };
   }, [user, boardId]);
