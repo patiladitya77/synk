@@ -1,4 +1,4 @@
-import { Command } from "./command";
+import { Command } from "./Command";
 
 export class CommandManager {
   private history: Command[] = [];
@@ -17,7 +17,7 @@ export class CommandManager {
     this.pointer--;
   }
   redo(): void {
-    if (this.pointer > this.history.length - 1) return;
+    if (this.pointer >= this.history.length - 1) return;
     this.pointer++;
     this.history[this.pointer].execute();
   }
