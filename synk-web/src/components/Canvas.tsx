@@ -14,6 +14,7 @@ import { CommandManager } from "@/canvas-engine/commands/CommandManager";
 import { MoveShapeCommand } from "@/canvas-engine/commands/MoveShapeCommand";
 import { AddShapeCommand } from "@/canvas-engine/commands/AddShapeCommand";
 import { DeleteShapeCommand } from "@/canvas-engine/commands/DeleteShapeCommand";
+import { ResizeShapeCommand } from "@/canvas-engine/commands/ResizeShapeCommand";
 
 export default function Canvas() {
   // Add these refs at the top of Canvas()
@@ -23,7 +24,11 @@ export default function Canvas() {
   const selectedShapeRef = useRef<Shape | null>(null);
   const isDraggingRef = useRef(false);
   const isResizingRef = useRef(false);
-  const resizeHandleRef = useRef<"tl" | "tr" | "bl" | "br" | null>(null);
+
+  const resizeHandleRef = useRef<
+    "tl" | "tm" | "tr" | "mr" | "br" | "bm" | "bl" | "ml" | null
+  >(null);
+  const resizeStartShapeSnapshotRef = useRef<Shape | null>(null);
   const dragStartRef = useRef({ x: 0, y: 0 });
   const user = useSelector((store: RootState) => store.user.user);
   const params = useParams() as { slug?: string | string[] };
@@ -74,6 +79,45 @@ export default function Canvas() {
     }
 
     return false;
+  }
+  function getHandleAtPos(shape: Shape, x: number, y: number, zoom: number) {
+    const HANDLE_SIZE = 8 / zoom;
+    const H = HANDLE_SIZE / 2;
+
+    let bx: number, by: number, bw: number, bh: number;
+    if (shape.type === "rect") {
+      bx = shape.x;
+      by = shape.y;
+      bw = shape.width;
+      bh = shape.height;
+    } else {
+      bx = shape.cx - shape.r;
+      by = shape.cy - shape.r;
+      bw = shape.r * 2;
+      bh = shape.r * 2;
+    }
+
+    const handles: {
+      id: typeof resizeHandleRef.current;
+      x: number;
+      y: number;
+    }[] = [
+      { id: "tl", x: bx, y: by },
+      { id: "tm", x: bx + bw / 2, y: by },
+      { id: "tr", x: bx + bw, y: by },
+      { id: "mr", x: bx + bw, y: by + bh / 2 },
+      { id: "br", x: bx + bw, y: by + bh },
+      { id: "bm", x: bx + bw / 2, y: by + bh },
+      { id: "bl", x: bx, y: by + bh },
+      { id: "ml", x: bx, y: by + bh / 2 },
+    ];
+
+    for (const h of handles) {
+      if (x >= h.x - H && x <= h.x + H && y >= h.y - H && y <= h.y + H) {
+        return h.id;
+      }
+    }
+    return null;
   }
 
   useEffect(() => {
@@ -164,6 +208,17 @@ export default function Canvas() {
       });
     };
 
+    const RESIZE_CURSORS: Record<string, string> = {
+      tl: "nwse-resize",
+      tm: "ns-resize",
+      tr: "nesw-resize",
+      mr: "ew-resize",
+      br: "nwse-resize",
+      bm: "ns-resize",
+      bl: "nesw-resize",
+      ml: "ew-resize",
+    };
+
     const getWorldPos = (e: MouseEvent) => {
       const rect = canvas.getBoundingClientRect();
       const { x, y, zoom } = cameraRef.current;
@@ -237,6 +292,21 @@ export default function Canvas() {
         isPanningRef.current = true;
         lastPanRef.current = { x: e.clientX, y: e.clientY };
         return;
+      }
+      if (selectedShapeRef.current) {
+        const handle = getHandleAtPos(
+          selectedShapeRef.current,
+          x,
+          y,
+          cameraRef.current.zoom,
+        );
+        if (handle) {
+          isResizingRef.current = true;
+          resizeHandleRef.current = handle;
+          dragStartRef.current = { x, y };
+          resizeStartShapeSnapshotRef.current = { ...selectedShapeRef.current };
+          return; // don't fall through to drag/place
+        }
       }
       // 1️ check if clicking on existing shape
       let hitAnyShape = false;
@@ -320,24 +390,118 @@ export default function Canvas() {
       }
 
       const { x, y } = getWorldPos(e);
+
+      // ── CURSOR PRIORITY (highest → lowest) ──────────────────────
+      if (isPanningRef.current) {
+        setCursor("move");
+      } else if (isResizingRef.current && resizeHandleRef.current) {
+        // Keep showing resize cursor while actively resizing
+        setCursor(RESIZE_CURSORS[resizeHandleRef.current]);
+      } else if (isDraggingRef.current) {
+        setCursor("grabbing");
+      } else if (selectedShapeRef.current) {
+        // Check if hovering a resize handle on the selected shape
+        const handle = getHandleAtPos(
+          selectedShapeRef.current,
+          x,
+          y,
+          cameraRef.current.zoom,
+        );
+        if (handle) {
+          setCursor(RESIZE_CURSORS[handle]);
+        } else if (hitTest(selectedShapeRef.current, x, y)) {
+          // Hovering the shape body → 4-way move cursor
+          setCursor("move");
+        } else {
+          setCursor("default");
+        }
+      } else {
+        // No selection — check if hovering any shape
+        let hoveringShape = false;
+        for (let i = shapesRef.current.length - 1; i >= 0; i--) {
+          if (hitTest(shapesRef.current[i], x, y)) {
+            hoveringShape = true;
+            break;
+          }
+        }
+        setCursor(hoveringShape ? "grab" : "default");
+      }
       let hoveringShape = false;
 
-      // hover detection
+      if (
+        isResizingRef.current &&
+        selectedShapeRef.current &&
+        resizeHandleRef.current
+      ) {
+        const handle = resizeHandleRef.current;
+        const shape = selectedShapeRef.current;
+        const dx = x - dragStartRef.current.x;
+        const dy = y - dragStartRef.current.y;
+        dragStartRef.current = { x, y };
+
+        if (shape.type === "rect") {
+          if (handle === "tl") {
+            shape.x += dx;
+            shape.y += dy;
+            shape.width -= dx;
+            shape.height -= dy;
+          }
+          if (handle === "tm") {
+            shape.y += dy;
+            shape.height -= dy;
+          }
+          if (handle === "tr") {
+            shape.y += dy;
+            shape.width += dx;
+            shape.height -= dy;
+          }
+          if (handle === "mr") {
+            shape.width += dx;
+          }
+          if (handle === "br") {
+            shape.width += dx;
+            shape.height += dy;
+          }
+          if (handle === "bm") {
+            shape.height += dy;
+          }
+          if (handle === "bl") {
+            shape.x += dx;
+            shape.width -= dx;
+            shape.height += dy;
+          }
+          if (handle === "ml") {
+            shape.x += dx;
+            shape.width -= dx;
+          }
+
+          // Clamp minimum size
+          shape.width = Math.max(10, shape.width);
+          shape.height = Math.max(10, shape.height);
+        }
+
+        if (shape.type === "circle") {
+          // For circles, grow/shrink radius based on dominant delta
+          const delta =
+            handle === "mr" || handle === "br" || handle === "bm"
+              ? Math.max(dx, dy)
+              : handle === "tl" || handle === "ml" || handle === "tm"
+                ? Math.min(dx, dy) * -1
+                : handle === "tr"
+                  ? Math.max(-dy, dx)
+                  : Math.max(dy, -dx); // bl
+
+          shape.r = Math.max(10, shape.r + delta);
+        }
+      }
+
+      // hover detection (used only for render, cursor already set above)
       for (let i = shapesRef.current.length - 1; i >= 0; i--) {
         const shape = shapesRef.current[i];
         if (hitTest(shape, x, y)) {
           hoveringShape = true;
           break;
         }
-      }
-      if (isPanningRef.current) {
-        setCursor("move");
-      } else if (isDraggingRef.current) {
-        setCursor("grabbing");
-      } else if (hoveringShape) {
-        setCursor("grab");
-      } else {
-        setCursor("default");
       }
 
       if (isDraggingRef.current && selectedShapeRef.current) {
@@ -458,6 +622,29 @@ export default function Canvas() {
           socket.emit("updateShape", { boardId, shape: after });
         }
       }
+      if (
+        isResizingRef.current &&
+        selectedShapeRef.current &&
+        resizeStartShapeSnapshotRef.current
+      ) {
+        commandManagerRef.current.record(
+          new ResizeShapeCommand(
+            shapesRef,
+            boardId!,
+            socket,
+            resizeStartShapeSnapshotRef.current,
+            { ...selectedShapeRef.current },
+          ),
+        );
+        socket.emit("updateShape", {
+          boardId,
+          shape: selectedShapeRef.current,
+        });
+        resizeStartShapeSnapshotRef.current = null;
+      }
+
+      isResizingRef.current = false;
+      resizeHandleRef.current = null;
 
       dragStartShapeSnapshotRef.current = null;
       isPanningRef.current = false;

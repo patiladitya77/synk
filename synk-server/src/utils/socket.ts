@@ -22,7 +22,7 @@ const initialiseSocket = (server: any) => {
 
       socket.join(roomId);
       const shapes = await prisma.shape.findMany({
-        where: { boardId: board.id },
+        where: { boardId: board.id, isDeleted: false },
       });
       console.log("name: ", name);
       console.log("boardId: ", board.id);
@@ -111,7 +111,7 @@ const initialiseSocket = (server: any) => {
       },
     );
 
-    //delete shape
+    //delete shape (soft delete)
     socket.on("deleteShape", async ({ boardId: slug, shapeId }) => {
       const board = await prisma.board.findFirst({ where: { slug } });
       if (!board) {
@@ -120,12 +120,37 @@ const initialiseSocket = (server: any) => {
       }
       const roomId = getBoardRoomId(board.id);
       try {
-        await prisma.shape.delete({ where: { id: shapeId } });
+        await prisma.shape.update({
+          where: { id: shapeId },
+          data: { isDeleted: true },
+        });
         io.to(roomId).emit("shapeDeleted", { shapeId });
-        console.log("shape deleted");
+        console.log("shape soft-deleted");
       } catch (error) {
         console.error("Failed to delete shape:", error);
         socket.emit("error", "Failed to delete shape");
+      }
+    });
+
+    // restore shape (undo delete)
+    socket.on("restoreShape", async ({ boardId: slug, shapeId }) => {
+      const board = await prisma.board.findFirst({ where: { slug } });
+      if (!board) {
+        socket.emit("error", "board not found");
+        return;
+      }
+      const roomId = getBoardRoomId(board.id);
+      try {
+        const shape = await prisma.shape.update({
+          where: { id: shapeId },
+          data: { isDeleted: false },
+        });
+        const shapeData = shape.data as Shape;
+        const restored = { ...shapeData, id: shape.id };
+        io.to(roomId).emit("shapeDrawn", restored);
+      } catch (error) {
+        console.error("Failed to restore shape:", error);
+        socket.emit("error", "Failed to restore shape");
       }
     });
 

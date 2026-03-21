@@ -96,7 +96,7 @@ const Footer = () => {
             <span className="font-semibold text-foreground">Whiteboard</span>
           </div>
           <p className="text-sm text-muted-foreground">
-            © 2025 Whiteboard. All rights reserved.
+            © 2025 Synk. All rights reserved.
           </p>
         </div>
       </div>
