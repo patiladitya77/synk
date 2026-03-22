@@ -5,14 +5,21 @@ export type Shape =
       y: number;
       width: number;
       height: number;
-      id: number;
+      fill?: string;
+      stroke?: string;
+      strokeWidth?: number;
+      id: string;
     }
   | {
-      type: "circle";
-      cx: number;
-      cy: number;
-      r: number;
-      id: number;
+      type: "oval";
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      fill?: string;
+      stroke?: string;
+      strokeWidth?: number;
+      id: string;
     };
 
 export type Camera = {

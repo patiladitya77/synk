@@ -1,5 +1,3 @@
-// shapeRenderer.ts
-
 import { Shape } from "./types";
 
 export interface ShapeRenderer<T extends Shape = Shape> {

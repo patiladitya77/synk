@@ -7,7 +7,7 @@ import { RootState } from "@/utils/appStore";
 
 const Header = () => {
   const { isAuthenticated, authLoading, user } = useSelector(
-    (state: RootState) => state.user
+    (state: RootState) => state.user,
   );
 
   return (
@@ -16,9 +16,9 @@ const Header = () => {
         {/* Logo */}
         <div className="flex items-center gap-2">
           <div className="w-8 h-8 bg-primary rounded-lg flex items-center justify-center">
-            <span className="text-primary-foreground font-bold text-lg">W</span>
+            <span className="text-primary-foreground font-bold text-lg">S</span>
           </div>
-          <span className="font-bold text-xl text-foreground">Whiteboard</span>
+          <span className="font-bold text-xl text-foreground">Synk</span>
         </div>
 
         {/* Nav */}
