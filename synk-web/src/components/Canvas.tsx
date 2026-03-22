@@ -71,11 +71,15 @@ export default function Canvas() {
         y <= shape.y + shape.height
       );
     }
-
-    if (shape.type === "circle") {
-      const dx = x - shape.cx;
-      const dy = y - shape.cy;
-      return dx * dx + dy * dy <= shape.r * shape.r;
+    if (shape.type === "oval") {
+      // Point-in-ellipse test using bounding box
+      const cx = shape.x + shape.width / 2;
+      const cy = shape.y + shape.height / 2;
+      const rx = shape.width / 2;
+      const ry = shape.height / 2;
+      const dx = (x - cx) / rx;
+      const dy = (y - cy) / ry;
+      return dx * dx + dy * dy <= 1;
     }
 
     return false;
@@ -91,17 +95,13 @@ export default function Canvas() {
       bw = shape.width;
       bh = shape.height;
     } else {
-      bx = shape.cx - shape.r;
-      by = shape.cy - shape.r;
-      bw = shape.r * 2;
-      bh = shape.r * 2;
+      bx = shape.x;
+      by = shape.y;
+      bw = shape.width;
+      bh = shape.height;
     }
 
-    const handles: {
-      id: typeof resizeHandleRef.current;
-      x: number;
-      y: number;
-    }[] = [
+    const handles = [
       { id: "tl", x: bx, y: by },
       { id: "tm", x: bx + bw / 2, y: by },
       { id: "tr", x: bx + bw, y: by },
@@ -110,7 +110,7 @@ export default function Canvas() {
       { id: "bm", x: bx + bw / 2, y: by + bh },
       { id: "bl", x: bx, y: by + bh },
       { id: "ml", x: bx, y: by + bh / 2 },
-    ];
+    ] as const;
 
     for (const h of handles) {
       if (x >= h.x - H && x <= h.x + H && y >= h.y - H && y <= h.y + H) {
@@ -439,7 +439,8 @@ export default function Canvas() {
         const dy = y - dragStartRef.current.y;
         dragStartRef.current = { x, y };
 
-        if (shape.type === "rect") {
+        // Both rect and oval use identical bounding-box resize logic now
+        if (shape.type === "rect" || shape.type === "oval") {
           if (handle === "tl") {
             shape.x += dx;
             shape.y += dy;
@@ -475,23 +476,8 @@ export default function Canvas() {
             shape.width -= dx;
           }
 
-          // Clamp minimum size
           shape.width = Math.max(10, shape.width);
           shape.height = Math.max(10, shape.height);
-        }
-
-        if (shape.type === "circle") {
-          // For circles, grow/shrink radius based on dominant delta
-          const delta =
-            handle === "mr" || handle === "br" || handle === "bm"
-              ? Math.max(dx, dy)
-              : handle === "tl" || handle === "ml" || handle === "tm"
-                ? Math.min(dx, dy) * -1
-                : handle === "tr"
-                  ? Math.max(-dy, dx)
-                  : Math.max(dy, -dx); // bl
-
-          shape.r = Math.max(10, shape.r + delta);
         }
       }
 
@@ -510,13 +496,9 @@ export default function Canvas() {
 
         const shape = selectedShapeRef.current;
 
-        if (shape.type === "rect") {
-          shape.x += dx;
-          shape.y += dy;
-        } else {
-          shape.cx += dx;
-          shape.cy += dy;
-        }
+        // Both rect and oval use x/y now
+        shape.x += dx;
+        shape.y += dy;
 
         dragStartRef.current = { x, y };
       }
@@ -588,11 +570,7 @@ export default function Canvas() {
 
         // Only record if the shape actually moved
         const didMove =
-          before.type === "rect"
-            ? before.x !== (after as any).x || before.y !== (after as any).y
-            : before.type === "circle"
-              ? (before as any).cx !== (after as any).cx
-              : false;
+          before.x !== (after as any).x || before.y !== (after as any).y;
 
         if (didMove) {
           const cmd = new MoveShapeCommand(
@@ -681,7 +659,7 @@ export default function Canvas() {
           isPlacingRef.current = true;
         }}
         onSelectCircle={() => {
-          activeToolRef.current = TOOLS.circle;
+          activeToolRef.current = TOOLS.oval;
           isPlacingRef.current = true;
         }}
       />

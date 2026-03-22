@@ -49,11 +49,11 @@ export function render({
       bw = selectedShape.width;
       bh = selectedShape.height;
     } else {
-      // circle
-      bx = selectedShape.cx - selectedShape.r;
-      by = selectedShape.cy - selectedShape.r;
-      bw = selectedShape.r * 2;
-      bh = selectedShape.r * 2;
+      // oval — already bounding box based
+      bx = selectedShape.x;
+      by = selectedShape.y;
+      bw = selectedShape.width;
+      bh = selectedShape.height;
     }
 
     // Dashed selection boundary
