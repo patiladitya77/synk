@@ -14,7 +14,7 @@ import {
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import Link from "next/link";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import axios from "axios";
 import { useRouter, useSearchParams } from "next/navigation";
 
@@ -40,7 +40,15 @@ enum AuthStep {
   SET_NEW_PASSWORD = "set_new_password",
 }
 
-export default function Login() {
+export default function LoginPage() {
+  return (
+    <Suspense>
+      <Login />
+    </Suspense>
+  );
+}
+
+function Login() {
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get("invite");
   const { showToast } = useGlobalToast();
