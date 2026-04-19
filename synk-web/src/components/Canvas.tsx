@@ -1,8 +1,8 @@
 "use client";
 
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import CanvasTopBar from "./CanvasTopBar";
-import { TOOLS } from "@/canvas-engine/tools";
+import { ARROW_TOOL_ID, TOOLS } from "@/canvas-engine/tools";
 import { render } from "@/canvas-engine/renderer";
 import { Shape } from "@/canvas-engine/types";
 import { pan, zoomAt } from "@/canvas-engine/camera";
@@ -15,6 +15,13 @@ import { MoveShapeCommand } from "@/canvas-engine/commands/MoveShapeCommand";
 import { AddShapeCommand } from "@/canvas-engine/commands/AddShapeCommand";
 import { DeleteShapeCommand } from "@/canvas-engine/commands/DeleteShapeCommand";
 import { ResizeShapeCommand } from "@/canvas-engine/commands/ResizeShapeCommand";
+import { ArrowShape } from "@/canvas-engine/types/ArrowShape";
+import {
+  arrowToolGetPreview,
+  arrowToolMouseDown,
+  arrowToolMouseUp,
+} from "@/canvas-engine/tools/ArrowTool";
+import { hitTestArrow } from "@/canvas-engine/Arrow";
 
 export default function Canvas() {
   // Add these refs at the top of Canvas()
@@ -42,7 +49,12 @@ export default function Canvas() {
 
   console.log(user);
 
-  const activeToolRef = useRef(TOOLS.rect);
+  const activeToolRef = useRef<
+    typeof TOOLS.rect | typeof TOOLS.oval | typeof ARROW_TOOL_ID
+  >(TOOLS.rect);
+  const [activeTool, setActiveTool] = useState<"rect" | "oval" | "arrow">(
+    "rect",
+  );
 
   const cameraRef = useRef({
     x: 0, // pan X
@@ -53,6 +65,9 @@ export default function Canvas() {
   const isPlacingRef = useRef(false);
   const lastPanRef = useRef({ x: 0, y: 0 });
   const isPanningRef = useRef(false);
+
+  const isDrawingArrowRef = useRef(false);
+  const arrowPreviewRef = useRef<ArrowShape | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const shapesRef = useRef<Shape[]>([]);
@@ -81,10 +96,15 @@ export default function Canvas() {
       const dy = (y - cy) / ry;
       return dx * dx + dy * dy <= 1;
     }
+    if (shape.type === "arrow") {
+      //delegate to the segment-distance hit test
+      return hitTestArrow(shape, x, y, shapesRef.current);
+    }
 
     return false;
   }
   function getHandleAtPos(shape: Shape, x: number, y: number, zoom: number) {
+    if (shape.type === "arrow") return null;
     const HANDLE_SIZE = 8 / zoom;
     const H = HANDLE_SIZE / 2;
 
@@ -293,6 +313,14 @@ export default function Canvas() {
         lastPanRef.current = { x: e.clientX, y: e.clientY };
         return;
       }
+
+      if (activeToolRef.current === ARROW_TOOL_ID) {
+        arrowToolMouseDown(x, y, shapesRef.current);
+        isDrawingArrowRef.current = true;
+        selectedShapeRef.current = null; // deselect anything
+        return;
+      }
+
       if (selectedShapeRef.current) {
         const handle = getHandleAtPos(
           selectedShapeRef.current,
@@ -390,6 +418,20 @@ export default function Canvas() {
       }
 
       const { x, y } = getWorldPos(e);
+
+      if (isDrawingArrowRef.current) {
+        setCursor("crosshair");
+        const preview = arrowToolGetPreview(x, y, shapesRef.current);
+        render({
+          ctx,
+          canvas,
+          camera: cameraRef.current,
+          shapes: shapesRef.current,
+          preview,
+          selectedShape: null,
+        });
+        return; // skip all other cursor/drag logic while drawing arrow
+      }
 
       // ── CURSOR PRIORITY (highest → lowest) ──────────────────────
       if (isPanningRef.current) {
@@ -496,17 +538,25 @@ export default function Canvas() {
 
         const shape = selectedShapeRef.current;
 
-        // Both rect and oval use x/y now
-        shape.x += dx;
-        shape.y += dy;
+        if (shape.type === "rect" || shape.type === "oval") {
+          shape.x += dx;
+          shape.y += dy;
+        } else if (shape.type === "arrow") {
+          // CHANGED: move both endpoints of a free-floating arrow
+          shape.x1 += dx;
+          shape.y1 += dy;
+          shape.x2 += dx;
+          shape.y2 += dy;
+        }
 
         dragStartRef.current = { x, y };
       }
 
       const tool = activeToolRef.current;
-      const previewShape = isPlacingRef.current
-        ? (tool.getPreview?.({ x, y }) ?? undefined)
-        : undefined;
+      const previewShape =
+        isPlacingRef.current && activeToolRef.current !== ARROW_TOOL_ID
+          ? (activeToolRef.current.getPreview?.({ x, y }) ?? undefined)
+          : undefined;
 
       render({
         ctx,
@@ -560,6 +610,33 @@ export default function Canvas() {
     };
 
     const onMouseUp = (e: MouseEvent) => {
+      const { x, y } = getWorldPos(e);
+
+      if (isDrawingArrowRef.current) {
+        isDrawingArrowRef.current = false;
+        const arrow = arrowToolMouseUp(x, y, shapesRef.current, () =>
+          crypto.randomUUID(),
+        );
+        if (arrow) {
+          const cmd = new AddShapeCommand(
+            shapesRef,
+            boardId!,
+            socket,
+            arrow,
+            user.id,
+          );
+          commandManagerRef.current.execute(cmd);
+        }
+        render({
+          ctx,
+          canvas,
+          camera: cameraRef.current,
+          shapes: shapesRef.current,
+          selectedShape: null,
+        });
+        return;
+      }
+
       if (
         isDraggingRef.current &&
         selectedShapeRef.current &&
@@ -569,8 +646,18 @@ export default function Canvas() {
         const after = selectedShapeRef.current;
 
         // Only record if the shape actually moved
-        const didMove =
-          before.x !== (after as any).x || before.y !== (after as any).y;
+        let didMove = false;
+        if (
+          (after.type === "rect" || after.type === "oval") &&
+          (before.type === "rect" || before.type === "oval")
+        ) {
+          didMove = before.x !== after.x || before.y !== after.y;
+        } else if (after.type === "arrow") {
+          //  check arrow endpoints moved
+          didMove =
+            (before as ArrowShape).x1 !== after.x1 ||
+            (before as ArrowShape).y1 !== after.y1;
+        }
 
         if (didMove) {
           const cmd = new MoveShapeCommand(
@@ -657,11 +744,20 @@ export default function Canvas() {
         onSelectRect={() => {
           activeToolRef.current = TOOLS.rect;
           isPlacingRef.current = true;
+          setActiveTool("rect");
         }}
         onSelectCircle={() => {
           activeToolRef.current = TOOLS.oval;
           isPlacingRef.current = true;
+          setActiveTool("oval");
         }}
+        onSelectArrow={() => {
+          activeToolRef.current = ARROW_TOOL_ID;
+          isPlacingRef.current = false; // arrow doesn't use isPlacing
+          isDrawingArrowRef.current = false;
+          setActiveTool("arrow");
+        }}
+        activeTool={activeTool}
       />
 
       {/* Canvas */}
