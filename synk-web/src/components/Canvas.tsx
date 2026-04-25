@@ -341,16 +341,13 @@ export default function Canvas() {
 
       for (let i = shapesRef.current.length - 1; i >= 0; i--) {
         const shape = shapesRef.current[i];
-        selectedShapeRef.current = shape;
-        isDraggingRef.current = true;
-        dragStartRef.current = { x, y };
-        setCursor("grabbing");
 
         if (hitTest(shape, x, y)) {
           selectedShapeRef.current = shape;
           isDraggingRef.current = true;
           dragStartRef.current = { x, y };
           dragStartShapeSnapshotRef.current = { ...shape };
+          setCursor("grabbing");
           hitAnyShape = true;
 
           render({

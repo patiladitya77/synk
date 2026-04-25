@@ -20,6 +20,22 @@ export type Shape =
       stroke?: string;
       strokeWidth?: number;
       id: string;
+    }
+  | {
+      type: "arrow";
+      id: string;
+      x1: number; // start point X
+      y1: number; // start point Y
+      x2: number; // end point X
+      y2: number; // end point Y
+      fromShapeId?: string; // optional — anchored to a shape
+      fromPort?: "n" | "s" | "e" | "w";
+      toShapeId?: string;
+      toPort?: "n" | "s" | "e" | "w";
+      stroke?: string;
+      strokeWidth?: number;
+      // NOTE: waypoints are NOT here — they are computed at render time
+      // from the router and never persisted to the server
     };
 
 export type Camera = {
