@@ -34,8 +34,8 @@ export type Shape =
       toPort?: "n" | "s" | "e" | "w";
       stroke?: string;
       strokeWidth?: number;
-      // NOTE: waypoints are NOT here — they are computed at render time
-      // from the router and never persisted to the server
+      // Computed at render time by the router — never persisted to the server
+      waypoints?: { x: number; y: number }[];
     };
 
 export type Camera = {
