@@ -1,0 +1,315 @@
+# Implementation Plan: Canvas Engine Testing
+
+## Overview
+
+This plan implements a comprehensive test suite for the canvas engine's core functionality using Jest and fast-check for property-based testing. The implementation covers shape creation, arrow port snapping and routing, command pattern operations (Add, Delete, Move, Resize), and command history management with undo/redo.
+
+## Tasks
+
+- [ ] 1. Set up test utilities and infrastructure
+  - [ ] 1.1 Create test-utils directory and generators module
+    - Create `synk-web/src/canvas-engine/test-utils/generators.ts`
+    - Implement fast-check arbitraries for coordinates, dimensions, shape IDs, and ports
+    - Implement generators for RectangleShape, OvalShape, and ArrowShape
+    - Implement composite generators (arbShape, arbShapeArray)
+    - _Requirements: All requirements (foundation for property-based testing)_
+  - [ ] 1.2 Create mocks module for Socket.IO testing
+    - Create `synk-web/src/canvas-engine/test-utils/mocks.ts`
+    - Implement createMockSocket function with jest.fn() for emit, on, once, off
+    - Implement createMockShapesRef function for React ref mocking
+    - Implement expectSocketEmit helper for verifying socket emissions
+    - _Requirements: 7.2, 8.2, 9.2, 10.2, 11.2, 12.2, 13.2, 14.2_
+  - [ ] 1.3 Create custom assertions module
+    - Create `synk-web/src/canvas-engine/test-utils/assertions.ts`
+    - Implement assertShapePropertiesEqual for comparing shapes
+    - Implement assertPortAtEdgeMidpoint for validating port positions
+    - Implement assertPathIsOrthogonal for validating routing paths
+    - Implement assertPathIsSmoothed for validating waypoint optimization
+    - _Requirements: 5.1-5.5, 6.3, 6.6, 20.1-20.5_
+
+- [ ] 2. Implement shape creation tests
+  - [ ] 2.1 Create rectangle shape creation tests
+    - Create `synk-web/src/canvas-engine/__tests__/shapes.test.ts`
+    - Write unit tests for rectangle creation with valid coordinates
+    - Verify shape type, id uniqueness, and property preservation
+    - Test optional styling properties (fill, stroke, strokeWidth)
+    - _Requirements: 1.1, 1.2, 1.3, 1.4_
+  - [ ]\* 2.2 Write property test for rectangle creation
+    - **Property 1: Shape Creation Preserves Properties**
+    - **Validates: Requirements 1.1, 1.2, 1.3, 1.4**
+    - Use arbRectangle generator to verify all properties are preserved
+  - [ ] 2.3 Create oval shape creation tests
+    - Write unit tests for oval creation with valid coordinates
+    - Verify shape type, id uniqueness, and property preservation
+    - Test optional styling properties
+    - _Requirements: 2.1, 2.2, 2.3, 2.4_
+  - [ ]\* 2.4 Write property test for oval creation
+    - **Property 1: Shape Creation Preserves Properties**
+    - **Validates: Requirements 2.1, 2.2, 2.3, 2.4**
+    - Use arbOval generator to verify all properties are preserved
+  - [ ] 2.5 Create arrow shape creation tests
+    - Write unit tests for arrow creation with start and end coordinates
+    - Verify shape type, id uniqueness, and endpoint properties
+    - Test unanchored arrows have no shape references
+    - _Requirements: 3.1, 3.2, 3.3, 3.4_
+  - [ ]\* 2.6 Write property test for arrow creation
+    - **Property 1: Shape Creation Preserves Properties**
+    - **Property 2: Unanchored Arrows Have No Shape References**
+    - **Validates: Requirements 3.1, 3.2, 3.3, 3.4**
+    - Use arbArrow generator to verify properties
+
+- [ ] 3. Implement port position and snapping tests
+  - [ ] 3.1 Create port position calculation tests
+    - Create `synk-web/src/canvas-engine/__tests__/Router.test.ts`
+    - Write unit tests for getPortPosition function
+    - Test north, south, east, west port calculations for rectangles
+    - Test port calculations for ovals
+    - Verify positions are at exact edge midpoints
+    - _Requirements: 5.1, 5.2, 5.3, 5.4, 5.5_
+  - [ ]\* 3.2 Write property test for port positions
+    - **Property 3: Port Positions Are Edge Midpoints**
+    - **Validates: Requirements 5.1, 5.2, 5.3, 5.4, 5.5**
+    - Use arbRectangle, arbOval, and arbPort generators
+    - Verify with assertPortAtEdgeMidpoint assertion
+  - [ ] 3.3 Create port snapping tests
+    - Write unit tests for findNearestPort function
+    - Test snapping within snap radius
+    - Test no snapping outside snap radius
+    - Test nearest port selection with multiple candidates
+    - Verify shapeId and port direction are set correctly
+    - _Requirements: 4.1, 4.2, 4.3, 4.4, 4.5_
+  - [ ]\* 3.4 Write property tests for port snapping
+    - **Property 4: Port Snapping Within Radius**
+    - **Property 5: No Snapping Outside Radius**
+    - **Property 6: Nearest Port Selection**
+    - **Validates: Requirements 4.1, 4.2, 4.3, 4.4, 4.5**
+    - Generate random points and shapes to test snapping behavior
+
+- [ ] 4. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 5. Implement arrow routing and pathfinding tests
+  - [ ] 5.1 Create grid construction tests
+    - Create `synk-web/src/canvas-engine/__tests__/grid.test.ts`
+    - Write unit tests for grid construction from shapes
+    - Test cell blocking logic for rectangles and ovals
+    - Test grid boundary conditions
+    - _Requirements: 6.2 (grid is foundation for obstacle avoidance)_
+  - [ ] 5.2 Create A\* pathfinding tests
+    - Create `synk-web/src/canvas-engine/__tests__/Astar.test.ts`
+    - Write unit tests for A\* algorithm with no obstacles
+    - Test pathfinding with obstacles
+    - Test no valid path scenarios
+    - Verify orthogonal path constraints
+    - _Requirements: 6.1, 6.2, 6.3, 6.5_
+  - [ ]_ 5.3 Write property tests for A_ pathfinding
+    - **Property 7: Obstacle-Free Routing Is Direct**
+    - **Property 8: Routed Paths Avoid Obstacles**
+    - **Property 9: Routed Paths Are Orthogonal**
+    - **Validates: Requirements 6.1, 6.2, 6.3**
+    - Use arbShapeArray to generate obstacle configurations
+  - [ ] 5.4 Create arrow routing integration tests
+    - Add tests to Router.test.ts for routeArrow function
+    - Test routing with anchored arrows (port-to-port)
+    - Test routing with unanchored arrows (coordinate-to-coordinate)
+    - Test waypoint smoothing (direction changes only)
+    - Test fallback to straight line when no path exists
+    - _Requirements: 6.1, 6.2, 6.3, 6.4, 6.5, 6.6_
+  - [ ]\* 5.5 Write property tests for arrow routing
+    - **Property 10: Anchored Arrows Start and End at Ports**
+    - **Property 11: Fallback Path When No Route Exists**
+    - **Property 12: Waypoints Represent Direction Changes**
+    - **Validates: Requirements 6.4, 6.5, 6.6**
+    - Use assertPathIsSmoothed and assertPathIsOrthogonal assertions
+
+- [ ] 6. Implement AddShapeCommand tests
+  - [ ] 6.1 Create AddShapeCommand execution tests
+    - Create `synk-web/src/canvas-engine/commands/__tests__/AddShapeCommand.test.ts`
+    - Write unit tests for execute method
+    - Verify shape is added to shapes array
+    - Verify socket emits "drawShape" event with correct payload
+    - Test with rectangle, oval, and arrow shapes
+    - _Requirements: 7.1, 7.2, 7.3, 7.4, 7.5_
+  - [ ]\* 6.2 Write property test for AddShapeCommand execution
+    - **Property 13: AddShapeCommand Execution Adds Shape**
+    - **Validates: Requirements 7.1, 7.2**
+    - Use arbShape generator to test all shape types
+  - [ ] 6.3 Create AddShapeCommand undo tests
+    - Write unit tests for undo method
+    - Verify shape is removed from shapes array
+    - Verify socket emits "deleteShape" event with correct shape ID
+    - Test undo for all shape types
+    - _Requirements: 8.1, 8.2, 8.3, 8.4_
+  - [ ]\* 6.4 Write property test for AddShapeCommand undo
+    - **Property 14: AddShapeCommand Undo Removes Shape**
+    - **Validates: Requirements 8.1, 8.2, 8.3**
+    - Verify execute followed by undo removes the shape
+
+- [ ] 7. Implement DeleteShapeCommand tests
+  - [ ] 7.1 Create DeleteShapeCommand execution tests
+    - Create `synk-web/src/canvas-engine/commands/__tests__/DeleteShapeCommand.test.ts`
+    - Write unit tests for execute method
+    - Verify shape is removed from shapes array
+    - Verify socket emits "deleteShape" event
+    - Test waypoint capture for shapes with connected arrows
+    - Verify only target shape is removed
+    - _Requirements: 9.1, 9.2, 9.3, 9.4_
+  - [ ]\* 7.2 Write property test for DeleteShapeCommand execution
+    - **Property 15: DeleteShapeCommand Execution Removes Shape**
+    - **Property 16: DeleteShapeCommand Captures Arrow Waypoints**
+    - **Validates: Requirements 9.1, 9.2, 9.3, 9.4**
+  - [ ] 7.3 Create DeleteShapeCommand undo tests
+    - Write unit tests for undo method
+    - Verify shape is restored to shapes array
+    - Verify socket emits "restoreShape" event
+    - Verify original shape ID is preserved
+    - Test arrow waypoint restoration
+    - Test undo for all shape types
+    - _Requirements: 10.1, 10.2, 10.3, 10.4, 10.5_
+  - [ ]\* 7.4 Write property test for DeleteShapeCommand undo
+    - **Property 17: DeleteShapeCommand Undo Restores Shape**
+    - **Property 18: DeleteShapeCommand Undo Restores Arrow Waypoints**
+    - **Validates: Requirements 10.1, 10.2, 10.3, 10.4, 10.5**
+
+- [ ] 8. Checkpoint - Ensure all tests pass
+  - Ensure all tests pass, ask the user if questions arise.
+
+- [ ] 9. Implement MoveShapeCommand tests
+  - [ ] 9.1 Create MoveShapeCommand execution tests
+    - Create `synk-web/src/canvas-engine/commands/__tests__/MoveShapeCommand.test.ts`
+    - Write unit tests for execute method
+    - Verify shape position is updated in shapes array
+    - Verify socket emits "updateShape" event
+    - Verify new position coordinates are correct
+    - Verify other properties (width, height, type, id) remain unchanged
+    - _Requirements: 11.1, 11.2, 11.3, 11.4_
+  - [ ]\* 9.2 Write property test for MoveShapeCommand execution
+    - **Property 19: MoveShapeCommand Execution Updates Position**
+    - **Validates: Requirements 11.1, 11.2, 11.3, 11.4**
+    - Verify dimensions and other properties are preserved
+  - [ ] 9.3 Create MoveShapeCommand undo tests
+    - Write unit tests for undo method
+    - Verify shape returns to original position
+    - Verify socket emits "updateShape" event
+    - Verify old position coordinates are restored
+    - Test undo for all shape types
+    - _Requirements: 12.1, 12.2, 12.3, 12.4_
+  - [ ]\* 9.4 Write property test for MoveShapeCommand round-trip
+    - **Property 20: MoveShapeCommand Round-Trip**
+    - **Validates: Requirements 12.1, 12.2, 12.4**
+    - Verify execute followed by undo restores exact original state
+
+- [ ] 10. Implement ResizeShapeCommand tests
+  - [ ] 10.1 Create ResizeShapeCommand execution tests
+    - Create `synk-web/src/canvas-engine/commands/__tests__/ResizeShapeCommand.test.ts`
+    - Write unit tests for execute method
+    - Verify shape dimensions are updated in shapes array
+    - Verify socket emits "updateShape" event
+    - Verify new width and height are correct
+    - Verify position (x, y) remains unchanged
+    - _Requirements: 13.1, 13.2, 13.3, 13.4_
+  - [ ]\* 10.2 Write property test for ResizeShapeCommand execution
+    - **Property 21: ResizeShapeCommand Execution Updates Dimensions**
+    - **Validates: Requirements 13.1, 13.2, 13.3, 13.4**
+    - Verify position and other properties are preserved
+  - [ ] 10.3 Create ResizeShapeCommand undo tests
+    - Write unit tests for undo method
+    - Verify shape returns to original dimensions
+    - Verify socket emits "updateShape" event
+    - Verify old width and height are restored
+    - Test undo for all resizable shapes
+    - _Requirements: 14.1, 14.2, 14.3, 14.4_
+  - [ ]\* 10.4 Write property test for ResizeShapeCommand round-trip
+    - **Property 22: ResizeShapeCommand Round-Trip**
+    - **Validates: Requirements 14.1, 14.2, 14.4**
+    - Verify execute followed by undo restores exact original state
+
+- [ ] 11. Implement CommandManager tests
+  - [ ] 11.1 Create CommandManager undo operation tests
+    - Create `synk-web/src/canvas-engine/commands/__tests__/CommandManager.test.ts`
+    - Write unit tests for undo method
+    - Test undo invokes command's undo method
+    - Test undo with no history is a no-op
+    - Test multiple undos execute in reverse order (LIFO)
+    - Verify history pointer is decremented correctly
+    - Verify canUndo returns false when history is empty
+    - _Requirements: 15.1, 15.2, 15.3, 15.4, 15.5_
+  - [ ]\* 11.2 Write property test for CommandManager undo
+    - **Property 23: CommandManager Undo Invokes Command Undo**
+    - **Property 24: CommandManager Undo Order Is LIFO**
+    - **Validates: Requirements 15.1, 15.3, 15.4**
+  - [ ] 11.3 Create CommandManager redo operation tests
+    - Write unit tests for redo method
+    - Test redo invokes command's execute method
+    - Test redo with no redo history is a no-op
+    - Test multiple redos execute in forward order (FIFO)
+    - Verify history pointer is incremented correctly
+    - Verify canRedo returns false when at end of history
+    - _Requirements: 16.1, 16.2, 16.3, 16.4, 16.5_
+  - [ ]\* 11.4 Write property test for CommandManager redo
+    - **Property 25: CommandManager Redo Invokes Command Execute**
+    - **Property 26: CommandManager Redo Order Is FIFO**
+    - **Validates: Requirements 16.1, 16.3, 16.4**
+  - [ ] 11.5 Create CommandManager history management tests
+    - Write unit tests for history management
+    - Test new command clears redo history
+    - Test commands are added to history in order
+    - Test canUndo and canRedo at boundaries
+    - Verify history pointer remains in valid range
+    - _Requirements: 17.1, 17.2, 17.3, 17.4, 17.5_
+  - [ ]\* 11.6 Write property tests for history management
+    - **Property 27: New Command Clears Redo History**
+    - **Property 28: Commands Are Added to History in Order**
+    - **Property 29: History Pointer Remains in Valid Range**
+    - **Validates: Requirements 17.1, 17.2, 17.5**
+
+- [ ] 12. Implement command sequence and invariant tests
+  - [ ] 12.1 Create command idempotence tests
+    - Add tests to CommandManager.test.ts for idempotence
+    - Test execute-undo-redo produces same state as execute
+    - Test full undo sequence restores original state
+    - Test repeated undo/redo on same command
+    - _Requirements: 18.1, 18.2, 18.3, 18.4_
+  - [ ]\* 12.2 Write property test for command round-trip
+    - **Property 30: Command Execute-Undo-Redo Round-Trip**
+    - **Property 31: Full Undo Sequence Restores Original State**
+    - **Validates: Requirements 18.1, 18.2**
+  - [ ] 12.3 Create arrow connection validation tests
+    - Add tests to Router.test.ts for arrow connections
+    - Test arrow references valid shapes
+    - Test arrow endpoints follow connected shapes when moved
+    - Test invalid shape references fall back to coordinates
+    - Test connected shape deletion preserves waypoints
+    - _Requirements: 19.1, 19.2, 19.3, 19.4_
+  - [ ]\* 12.4 Write property tests for arrow connections
+    - **Property 32: Arrow References Valid Shapes**
+    - **Property 33: Arrow Endpoints Follow Connected Shapes**
+    - **Property 34: Invalid Shape References Fall Back to Coordinates**
+    - **Validates: Requirements 19.1, 19.3, 19.4**
+  - [ ] 12.5 Create shape property invariant tests
+    - Add tests across all command test files for invariants
+    - Test shape ID remains unchanged through operations
+    - Test shape type remains unchanged through operations
+    - Test move preserves dimensions
+    - Test resize preserves position
+    - Test undo restores all properties exactly
+    - _Requirements: 20.1, 20.2, 20.3, 20.4, 20.5_
+  - [ ]\* 12.6 Write property tests for shape invariants
+    - **Property 35: Shape ID Invariant**
+    - **Property 36: Shape Type Invariant**
+    - **Validates: Requirements 20.1, 20.2, 20.3, 20.4, 20.5**
+
+- [ ] 13. Final checkpoint - Ensure all tests pass
+  - Run full test suite with coverage
+  - Verify all property-based tests pass with 100 iterations
+  - Ensure coverage meets goals (100% for commands, Router, Astar, grid)
+  - Ensure all tests pass, ask the user if questions arise.
+
+## Notes
+
+- Tasks marked with `*` are optional property-based tests and can be skipped for faster MVP
+- Each task references specific requirements for traceability
+- Property tests use fast-check with 100 iterations per test
+- All tests use Jest as the test runner with existing configuration
+- Socket.IO is mocked to avoid requiring a real server connection
+- Test utilities are shared across all test files for consistency
