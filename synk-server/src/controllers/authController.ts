@@ -141,20 +141,7 @@ export const loginController = async (req: Request, res: Response) => {
       return res.status(401).json({ message: "Invalid credentials" });
     }
 
-    /* Enforce session limit */
-    const activeSessionCount = await prisma.session.count({
-      where: {
-        userId: user.id,
-        revokedAt: null,
-      },
-    });
-
-    if (activeSessionCount >= 5) {
-      return res.status(403).json({
-        message: "Too many active sessions",
-      });
-    }
-    /* Revoke existing sessions  */
+    /* Revoke existing sessions first - BEFORE checking limit */
     await prisma.session.updateMany({
       where: {
         userId: user.id,

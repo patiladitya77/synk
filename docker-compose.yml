@@ -1,0 +1,25 @@
+services:
+  synk-server:
+    build:
+      context: ./synk-server
+      dockerfile: dockerfile
+    ports:
+      - "7777:7777"
+    env_file:
+      - ./synk-server/.env
+    environment:
+      - NODE_ENV=production
+
+  synk-web:
+    build:
+      context: ./synk-web
+      dockerfile: dockerfile
+    ports:
+      - "3000:3000"
+    env_file:
+      - ./synk-web/.env
+    environment:
+      - NODE_ENV=production
+      - NEXT_PUBLIC_API_BASE_URL=http://synk-server:7777/
+    depends_on:
+      - synk-server

@@ -19,11 +19,19 @@ import {
 } from "@/services/authService";
 import Link from "next/link";
 import { useRouter, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { Suspense, useState } from "react";
 import { useDispatch } from "react-redux";
 import { GoogleLogin } from "@react-oauth/google";
 
-export default function Signup() {
+export default function SignupPage() {
+  return (
+    <Suspense>
+      <Signup />
+    </Suspense>
+  );
+}
+
+function Signup() {
   const searchParams = useSearchParams();
   const inviteToken = searchParams.get("invite");
   const [name, setName] = useState("");

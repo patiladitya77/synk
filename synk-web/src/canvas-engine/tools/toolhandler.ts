@@ -5,9 +5,13 @@ export type Point = {
   y: number;
 };
 
+// export interface ToolHandler {
+//   onPointerDown?(pos: Point): Shape | void;
+//   onPointerMove?(pos: Point): Shape | void;
+//   onPointerUp?(pos: Point): Shape | void;
+//   getPreview?(pos: Point): Shape | null;
+// }
 export interface ToolHandler {
-  onPointerDown?(pos: Point): Shape | void;
-  onPointerMove?(pos: Point): Shape | void;
-  onPointerUp?(pos: Point): Shape | void;
-  getPreview?(pos: Point): Shape | null;
+  onPointerDown?: (pos: { x: number; y: number }) => Shape | null;
+  getPreview?: (pos: { x: number; y: number }) => Shape | null;
 }

@@ -1,23 +1,23 @@
 import { ToolHandler } from "./toolhandler";
 
 export const OvalTool: ToolHandler = {
-  onPointerDown(pos) {
+  onPointerDown({ x, y }) {
     return {
       type: "oval",
       id: "",
-      x: pos.x - 40,
-      y: pos.y - 40,
+      x: x - 40,
+      y: y - 40,
       width: 80,
       height: 80,
     };
   },
 
-  getPreview(pos) {
+  getPreview({ x, y }) {
     return {
       type: "oval",
       id: "preview",
-      x: pos.x - 40,
-      y: pos.y - 40,
+      x: x - 40,
+      y: y - 40,
       width: 80,
       height: 80,
     };
