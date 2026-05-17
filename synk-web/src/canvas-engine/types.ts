@@ -22,6 +22,17 @@ export type Shape =
       id: string;
     }
   | {
+      type: "diamond";
+      x: number;
+      y: number;
+      width: number;
+      height: number;
+      fill?: string;
+      stroke?: string;
+      strokeWidth?: number;
+      id: string;
+    }
+  | {
       type: "arrow";
       id: string;
       x1: number; // start point X

@@ -2,13 +2,15 @@ type CanvasTopBarProps = {
   onSelectRect: () => void;
   onSelectCircle: () => void;
   onSelectArrow: () => void;
-  activeTool: "rect" | "oval" | "arrow";
+  onSelectDiamond: () => void;
+  activeTool: "rect" | "oval" | "arrow" | "diamond";
 };
 
 const CanvasTopBar = ({
   onSelectRect,
   onSelectCircle,
   onSelectArrow,
+  onSelectDiamond,
   activeTool,
 }: CanvasTopBarProps) => {
   const base =
@@ -77,6 +79,27 @@ const CanvasTopBar = ({
             strokeLinecap="round"
             strokeLinejoin="round"
             d="M4.5 19.5l15-15m0 0H8.25m11.25 0v11.25"
+          />
+        </svg>
+      </button>
+
+      <button
+        onClick={onSelectDiamond}
+        className={`${base} ${activeTool === "diamond" ? active : inactive}`}
+        title="Diamond"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={1.5}
+          stroke="currentColor"
+          className="size-6"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M12 3L21 12L12 21L3 12Z"
           />
         </svg>
       </button>
