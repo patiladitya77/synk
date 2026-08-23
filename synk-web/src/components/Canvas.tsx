@@ -50,11 +50,14 @@ export default function Canvas() {
   console.log(user);
 
   const activeToolRef = useRef<
-    typeof TOOLS.rect | typeof TOOLS.oval | typeof ARROW_TOOL_ID
+    | typeof TOOLS.rect
+    | typeof TOOLS.oval
+    | typeof TOOLS.diamond
+    | typeof ARROW_TOOL_ID
   >(TOOLS.rect);
-  const [activeTool, setActiveTool] = useState<"rect" | "oval" | "arrow">(
-    "rect",
-  );
+  const [activeTool, setActiveTool] = useState<
+    "rect" | "oval" | "arrow" | "diamond"
+  >("rect");
 
   const cameraRef = useRef({
     x: 0, // pan X
@@ -753,6 +756,11 @@ export default function Canvas() {
           isPlacingRef.current = false; // arrow doesn't use isPlacing
           isDrawingArrowRef.current = false;
           setActiveTool("arrow");
+        }}
+        onSelectDiamond={() => {
+          activeToolRef.current = TOOLS.diamond;
+          isPlacingRef.current = true;
+          setActiveTool("diamond");
         }}
         activeTool={activeTool}
       />

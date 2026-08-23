@@ -17,7 +17,11 @@ export function getPortPosition(
   shape: Shape,
   port: "n" | "s" | "e" | "w",
 ): Point {
-  if (shape.type === "rect" || shape.type === "oval") {
+  if (
+    shape.type === "rect" ||
+    shape.type === "oval" ||
+    shape.type === "diamond"
+  ) {
     const cx = shape.x + shape.width / 2;
     const cy = shape.y + shape.height / 2;
     switch (port) {
@@ -55,7 +59,12 @@ export function findNearestPort(
 
   for (const shape of shapes) {
     if (excludeIds.includes(shape.id)) continue;
-    if (shape.type !== "rect" && shape.type !== "oval") continue;
+    if (
+      shape.type !== "rect" &&
+      shape.type !== "oval" &&
+      shape.type !== "diamond"
+    )
+      continue;
 
     for (const port of ["n", "s", "e", "w"] as const) {
       const p = getPortPosition(shape, port);
