@@ -1,5 +1,6 @@
 import { ShapeRenderer } from "../shapeRenderer";
 import { DiamondShape } from "../types/DiamondShape";
+import { drawBoundingBoxSelection } from "./selectionHelper";
 
 export const diamondRenderer: ShapeRenderer<DiamondShape> = {
   draw(ctx, shape) {
@@ -20,16 +21,7 @@ export const diamondRenderer: ShapeRenderer<DiamondShape> = {
     ctx.stroke();
   },
 
-  drawSelection(ctx, shape) {
-    const cx = shape.x + shape.width / 2;
-    const cy = shape.y + shape.height / 2;
-
-    ctx.beginPath();
-    ctx.moveTo(cx, shape.y);
-    ctx.lineTo(shape.x + shape.width, cy);
-    ctx.lineTo(cx, shape.y + shape.height);
-    ctx.lineTo(shape.x, cy);
-    ctx.closePath();
-    ctx.stroke();
+  drawSelection(ctx, shape, zoom = 1) {
+    drawBoundingBoxSelection(ctx, shape, zoom);
   },
 };

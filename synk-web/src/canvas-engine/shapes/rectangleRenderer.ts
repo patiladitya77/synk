@@ -1,5 +1,6 @@
 import { ShapeRenderer } from "../shapeRenderer";
 import { RectShape } from "../types/ReactangleShape";
+import { drawBoundingBoxSelection } from "./selectionHelper";
 
 export const rectRenderer: ShapeRenderer<RectShape> = {
   draw(ctx, shape) {
@@ -11,22 +12,7 @@ export const rectRenderer: ShapeRenderer<RectShape> = {
     ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);
   },
 
-  drawSelection(ctx, shape, zoom) {
-    ctx.strokeRect(shape.x, shape.y, shape.width, shape.height);
-
-    const HANDLE_SIZE = 8 / zoom;
-    const drawHandle = (hx: number, hy: number) => {
-      ctx.fillRect(
-        hx - HANDLE_SIZE / 2,
-        hy - HANDLE_SIZE / 2,
-        HANDLE_SIZE,
-        HANDLE_SIZE,
-      );
-    };
-
-    drawHandle(shape.x, shape.y);
-    drawHandle(shape.x + shape.width, shape.y);
-    drawHandle(shape.x, shape.y + shape.height);
-    drawHandle(shape.x + shape.width, shape.y + shape.height);
+  drawSelection(ctx, shape, zoom = 1) {
+    drawBoundingBoxSelection(ctx, shape, zoom);
   },
 };
