@@ -3,6 +3,34 @@ import { Shape } from "../types";
 import { Socket } from "socket.io-client";
 import { Command } from "./Command";
 
+function isMatchingShape(local: Shape, server: Shape): boolean {
+  if (local.type !== server.type) return false;
+  if (
+    local.type === "rect" ||
+    local.type === "oval" ||
+    local.type === "diamond" ||
+    local.type === "text"
+  ) {
+    const s = server as typeof local;
+    return (
+      local.x === s.x &&
+      local.y === s.y &&
+      local.width === s.width &&
+      local.height === s.height
+    );
+  }
+  if (local.type === "arrow") {
+    const s = server as typeof local;
+    return (
+      local.x1 === s.x1 &&
+      local.y1 === s.y1 &&
+      local.x2 === s.x2 &&
+      local.y2 === s.y2
+    );
+  }
+  return false;
+}
+
 export class AddShapeCommand implements Command {
   private committedShape: Shape | null = null; // will hold the server-assigned id
   constructor(
@@ -12,13 +40,14 @@ export class AddShapeCommand implements Command {
     private shape: Shape,
     private userId: string,
   ) {
-    // Listen for the server's response and capture the real id
-    this.socket.once("shapeDrawn", (serverShape: Shape) => {
-      // Make sure it's our shape (same type + position)
-      if (serverShape.type === this.shape.type) {
+    // Listen for the server's response and match our shape by type + position
+    const onShapeDrawn = (serverShape: Shape) => {
+      if (isMatchingShape(this.shape, serverShape)) {
         this.committedShape = serverShape;
+        this.socket.off("shapeDrawn", onShapeDrawn);
       }
-    });
+    };
+    this.socket.on("shapeDrawn", onShapeDrawn);
   }
   execute(): void {
     console.log(this.shape);

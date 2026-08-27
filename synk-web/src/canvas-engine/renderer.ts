@@ -1,7 +1,7 @@
 import { Shape } from "./types";
 import { drawBackground, drawGrid } from "./draw";
 import { shapeRegistry } from "./shapes/shapeRegistery";
-import { routeArrow } from "./Router";
+import { routeArrow } from "./arrowRouter";
 
 export function render({
   ctx,
@@ -27,20 +27,22 @@ export function render({
   ctx.translate(camera.x, camera.y);
   ctx.scale(camera.zoom, camera.zoom);
 
-  // Pass allShapes so arrow renderer can route
+  // Render all shapes
   shapes.forEach((shape) => {
     const renderer = shapeRegistry[shape.type];
     renderer?.draw(ctx, shape, shapes);
   });
 
+  // Render live preview shape
   if (preview) {
     ctx.globalAlpha = 0.4;
     shapeRegistry[preview.type]?.draw(ctx, preview, shapes);
     ctx.globalAlpha = 1;
   }
 
+  // Render selection overlay
   if (selectedShape) {
-    // ── Arrow selection: two endpoint handles only ──────────────────────────
+    // ── Arrow selection: special routed path + 2 endpoint handles ───────────
     if (selectedShape.type === "arrow") {
       const waypoints = routeArrow(selectedShape, shapes);
       if (waypoints.length >= 2) {
@@ -78,54 +80,9 @@ export function render({
       return;
     }
 
-    // ── Rect / Oval selection: bounding box + 8 handles ─────────────────────
-    const HANDLE_SIZE = 8 / camera.zoom;
-
-    const bx = selectedShape.x;
-    const by = selectedShape.y;
-    const bw = selectedShape.width;
-    const bh = selectedShape.height;
-
-    // Dashed selection boundary
-    ctx.save();
-    ctx.strokeStyle = "#60a5fa";
-    ctx.lineWidth = 1 / camera.zoom;
-    ctx.setLineDash([6 / camera.zoom, 3 / camera.zoom]);
-    ctx.strokeRect(bx, by, bw, bh);
-    ctx.restore();
-
-    // 8 square handles
-    const handles = [
-      { x: bx, y: by },
-      { x: bx + bw / 2, y: by },
-      { x: bx + bw, y: by },
-      { x: bx + bw, y: by + bh / 2 },
-      { x: bx + bw, y: by + bh },
-      { x: bx + bw / 2, y: by + bh },
-      { x: bx, y: by + bh },
-      { x: bx, y: by + bh / 2 },
-    ];
-
-    handles.forEach(({ x, y }) => {
-      ctx.save();
-      ctx.fillStyle = "#ffffff";
-      ctx.strokeStyle = "#60a5fa";
-      ctx.lineWidth = 1.5 / camera.zoom;
-      ctx.setLineDash([]);
-      ctx.fillRect(
-        x - HANDLE_SIZE / 2,
-        y - HANDLE_SIZE / 2,
-        HANDLE_SIZE,
-        HANDLE_SIZE,
-      );
-      ctx.strokeRect(
-        x - HANDLE_SIZE / 2,
-        y - HANDLE_SIZE / 2,
-        HANDLE_SIZE,
-        HANDLE_SIZE,
-      );
-      ctx.restore();
-    });
+    // ── Delegate regular shape selection to shape renderer ─────────────────
+    const renderer = shapeRegistry[selectedShape.type];
+    renderer?.drawSelection?.(ctx, selectedShape, camera.zoom);
   }
 
   ctx.restore();
