@@ -3,7 +3,8 @@ type CanvasTopBarProps = {
   onSelectCircle: () => void;
   onSelectArrow: () => void;
   onSelectDiamond: () => void;
-  activeTool: "rect" | "oval" | "arrow" | "diamond";
+  onSelectText: () => void;
+  activeTool: "rect" | "oval" | "arrow" | "diamond" | "text";
 };
 
 const CanvasTopBar = ({
@@ -11,10 +12,11 @@ const CanvasTopBar = ({
   onSelectCircle,
   onSelectArrow,
   onSelectDiamond,
+  onSelectText,
   activeTool,
 }: CanvasTopBarProps) => {
   const base =
-    "w-10 h-10 border text-black rounded p-1 hover:bg-gray-100 transition-colors";
+    "w-10 h-10 border text-black rounded p-1 hover:bg-gray-100 transition-colors flex items-center justify-center";
   const active = "bg-blue-100 border-blue-400 text-blue-600";
   const inactive = "bg-white border-gray-200";
   return (
@@ -27,7 +29,7 @@ const CanvasTopBar = ({
     >
       <button
         onClick={onSelectRect}
-        className="w-10 h-10 text-black border p-1 rounded hover:bg-gray-100"
+        className={`${base} ${activeTool === "rect" ? active : inactive}`}
         title="Rectangle"
       >
         <svg
@@ -44,7 +46,7 @@ const CanvasTopBar = ({
 
       <button
         onClick={onSelectCircle}
-        className="w-10 h-10 border text-black rounded p-1 hover:bg-gray-100"
+        className={`${base} ${activeTool === "oval" ? active : inactive}`}
         title="Circle"
       >
         <svg
@@ -62,6 +64,7 @@ const CanvasTopBar = ({
           />
         </svg>
       </button>
+
       <button
         onClick={onSelectArrow}
         className={`${base} ${activeTool === "arrow" ? active : inactive}`}
@@ -100,6 +103,27 @@ const CanvasTopBar = ({
             strokeLinecap="round"
             strokeLinejoin="round"
             d="M12 3L21 12L12 21L3 12Z"
+          />
+        </svg>
+      </button>
+
+      <button
+        onClick={onSelectText}
+        className={`${base} ${activeTool === "text" ? active : inactive}`}
+        title="Text"
+      >
+        <svg
+          xmlns="http://www.w3.org/2000/svg"
+          fill="none"
+          viewBox="0 0 24 24"
+          strokeWidth={1.5}
+          stroke="currentColor"
+          className="size-6"
+        >
+          <path
+            strokeLinecap="round"
+            strokeLinejoin="round"
+            d="M7.5 4.5h9M12 4.5v15M9 19.5h6"
           />
         </svg>
       </button>
