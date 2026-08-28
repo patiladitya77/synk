@@ -1,3 +1,5 @@
+import { TextShape } from "./types/TextShape";
+
 export type Shape =
   | {
       type: "rect";
@@ -59,7 +61,11 @@ export type Shape =
       strokeWidth?: number;
       // Computed at render time by the router — never persisted to the server
       waypoints?: { x: number; y: number }[];
-    };
+    }
+  | TextShape;
+
+export type { TextShape };
+
 
 export type Camera = {
   x: number;
