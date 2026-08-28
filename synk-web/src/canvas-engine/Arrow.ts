@@ -1,4 +1,5 @@
-import { Point, routeArrow } from "./Router";
+import { Point } from "./arrowPorts";
+import { routeArrow } from "./arrowRouter";
 import { Shape } from "./types";
 import { ArrowShape } from "./types/ArrowShape";
 
@@ -10,9 +11,9 @@ const ARROWHEAD_ANGLE = 0.42; // radians — half-angle of arrowhead wings
 
 // ─── Hit test ────────────────────────────────────────────────────────────────
 
-/**
- * Point-to-segment distance, used for click detection on arrows.
- */
+
+// Point-to-segment distance, used for click detection on arrows.
+
 function distToSegment(
   px: number,
   py: number,
@@ -67,7 +68,7 @@ function drawArrowhead(ctx: CanvasRenderingContext2D, tip: Point, from: Point) {
   ctx.restore();
 }
 
-// ─── Rounded orthogonal path ──────────────────────────────────────────────────
+//  Rounded orthogonal path 
 
 /**
  * Draw a polyline with rounded corners using arcTo.
@@ -101,7 +102,7 @@ function drawRoundedPath(
   ctx.stroke();
 }
 
-// ─── Main draw ────────────────────────────────────────────────────────────────
+// Main draw
 
 export function drawArrow(
   ctx: CanvasRenderingContext2D,
