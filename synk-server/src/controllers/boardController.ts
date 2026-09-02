@@ -1,7 +1,9 @@
-import { Request, Response } from "express";
+import { Request, response, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { generateSlug } from "../utils/generateSlug";
 import crypto from "crypto";
+import { request } from "http";
+import { brotliCompress } from "zlib";
 export const createBoardController = async (req: Request, res: Response) => {
   try {
     const user = req.user;
@@ -201,5 +203,37 @@ export const acceptInviteController = async (req: Request, res: Response) => {
     res.json({ message: "Invite accepted successfully", boardId: board.slug });
   } catch (error) {
     return res.status(500).json({ error: "Something went wrong" });
+  }
+};
+
+export const archiveBoardController = async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "User does not exist" });
+    const boardId = req.params.boardId;
+
+    const board = await prisma.board.findFirst({
+      where: {
+        id: boardId,
+        ownerId: user.id,
+        isArchived: false,
+      },
+    });
+
+    if (!board)
+      return res.status(404).json({ message: "the board does not exists" });
+    await prisma.board.update({
+      where: {
+        id: boardId,
+      },
+      data: {
+        isArchived: true,
+        archivedAt: new Date(),
+      },
+    });
+
+    return res.status(200).json({ message: "sucess!" });
+  } catch (err) {
+    res.status(400).json({ message: "Failed to archive-  " + err });
   }
 };
