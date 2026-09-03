@@ -237,3 +237,36 @@ export const archiveBoardController = async (req: Request, res: Response) => {
     res.status(400).json({ message: "Failed to archive-  " + err });
   }
 };
+
+export const restoreBoardController = async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "user not found" });
+    const { boardId } = req.params;
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const board = await prisma.board.findFirst({
+      where: {
+        id: boardId,
+        ownerId: user.id,
+        isArchived: true,
+        archivedAt: {
+          gte: thirtyDaysAgo,
+        },
+      },
+    });
+    if (!board) return res.status(404).json({ message: "board not found" });
+
+    await prisma.board.update({
+      where: {
+        id: boardId,
+      },
+      data: {
+        isArchived: false,
+        archivedAt: null,
+      },
+    });
+    return res.status(200).json({ message: "success" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to restore-  " + err });
+  }
+};
