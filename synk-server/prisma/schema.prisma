@@ -19,10 +19,6 @@ model User {
   avatarUrl   String?
   lastLoginAt DateTime?
 
-  resetOtp       String?
-  resetOtpExpiry DateTime?
-  otpAttempts    Int       @default(0)
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -140,6 +136,5 @@ enum BoardRole {
 }
 
 enum AuthType {
-  password
   google
 }
