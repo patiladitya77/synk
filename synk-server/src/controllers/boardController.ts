@@ -1,9 +1,7 @@
-import { Request, response, Response } from "express";
+import { Request, Response } from "express";
 import { prisma } from "../lib/prisma";
 import { generateSlug } from "../utils/generateSlug";
 import crypto from "crypto";
-import { request } from "http";
-import { brotliCompress } from "zlib";
 export const createBoardController = async (req: Request, res: Response) => {
   try {
     const user = req.user;
