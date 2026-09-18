@@ -6,10 +6,10 @@ export const createBoardController = async (req: Request, res: Response) => {
   try {
     const user = req.user;
     if (!user) {
-      return res.json({ message: "User does not exist" });
+      return res.status(401).json({ message: "User does not exist" });
     }
     const { title } = req.body;
-    if (!title) return res.json({ message: "title requried" });
+    if (!title) return res.status(400).json({ message: "title requried" });
     const slug = generateSlug(title);
     const savedBoard = await prisma.board.create({
       data: {
@@ -46,7 +46,7 @@ export const getAllBoardsController = async (req: Request, res: Response) => {
   try {
     const user = req.user;
     if (!user) {
-      return res.json({ message: "User does not exist" });
+      return res.status(401).json({ message: "User does not exist" });
     }
     const boards = await prisma.board.findMany({
       where: {
@@ -117,7 +117,7 @@ export const generateInviteLinkController = async (
     const { boardId } = req.params;
     const user = req.user;
     if (!user) {
-      return res.json({ message: "user does not exists" });
+      return res.status(401).json({ message: "user does not exists" });
     }
     const board = await prisma.board.findUnique({ where: { id: boardId } });
     if (!board || board.ownerId !== user.id) {
@@ -165,7 +165,7 @@ export const acceptInviteController = async (req: Request, res: Response) => {
     const { token } = req.params;
     const user = req.user;
     if (!user) {
-      return res.json("User does not exixts");
+      return res.status(401).json("User does not exixts");
     }
     const board = await prisma.board.findFirst({
       where: {
@@ -214,7 +214,7 @@ export const archiveBoardController = async (req: Request, res: Response) => {
     });
 
     if (!board)
-      return res.status(404).json({ message: "the board does not exists" });
+      return res.status(404).json({ message: "Board does not exists" });
     await prisma.board.update({
       where: {
         id: boardId,
