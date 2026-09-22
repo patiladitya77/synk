@@ -14,9 +14,8 @@ Synk is a collaborative canvas application designed for teams to visualize ideas
 - **Smart Arrow Routing** - Arrows automatically find optimal paths around shapes using A\* pathfinding algorithm
 - **Undo/Redo Support** - Full operation history using the Command design pattern
 - **Infinite Canvas** - Unlimited workspace with pan and zoom capabilities
-- **Secure Authentication** - JWT-based auth with refresh tokens and Google OAuth support
+- **Secure Authentication** - Google OAuth authentication with JWT access and HTTP-only refresh tokens
 - **Board Sharing** - Generate invite links with 24-hour expiration to add collaborators
-- **Password Recovery** - OTP-based password reset via email
 
 ## Tech Stack
 
@@ -54,7 +53,6 @@ flowchart TB
 
     Prisma -->|SQL| PostgreSQL[(PostgreSQL Database)]
 
-    Controllers -->|Email| SMTP[Brevo SMTP]
     Controllers -->|OAuth| Google[Google OAuth API]
 
     Canvas -->|A* Pathfinding| Router[Arrow Router]
@@ -129,13 +127,9 @@ JWT_SECRET="your-jwt-secret"
 JWT_REFRESH_SECRET="your-refresh-secret"
 GOOGLE_CLIENT_ID="your-google-client-id"
 GOOGLE_CLIENT_SECRET="your-google-client-secret"
-SMTP_HOST="smtp-relay.brevo.com"
-SMTP_PORT=587
-SMTP_USER="your-smtp-user"
-SMTP_PASS="your-smtp-password"
 
 # synk-web/.env
-NEXT_PUBLIC_API_BASE_URL="http://localhost:5000"
+NEXT_PUBLIC_API_BASE_URL="http://localhost:7777"
 NEXT_PUBLIC_GOOGLE_CLIENT_ID="your-google-client-id"
 ```
 
