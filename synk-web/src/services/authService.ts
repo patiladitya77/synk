@@ -34,7 +34,7 @@ export const authenticateWithGoogle = async (
 
       return {
         ...res,
-        inviteSlug: inviteRes.data.slug,
+        inviteSlug: inviteRes.data.boardId || inviteRes.data.slug,
       };
     }
   }
