@@ -6,6 +6,35 @@ import { prisma } from "../lib/prisma";
 const getBoardRoomId = (boardId: string) => {
   return createHash("sha256").update(boardId).digest("hex");
 };
+const broadcastPresence = async (
+  io: Server,
+  roomId: string,
+  excludeSocketId?: string
+) => {
+  const sockets = await io.in(roomId).fetchSockets();
+
+  const uniqueUsers = new Map();
+
+  sockets.forEach((socket) => {
+    // Exclude the disconnecting socket
+    if (socket.id === excludeSocketId) return;
+
+    const user = socket.data.user;
+
+    if (user) {
+      uniqueUsers.set(user.userId, {
+        userId: user.userId,
+        name: user.name,
+      });
+    }
+  });
+
+  const users = Array.from(uniqueUsers.values());
+
+  console.log("Connected users:", users);
+
+  io.to(roomId).emit("presence:update", users);
+};
 const initialiseSocket = (server: any) => {
   const io = new Server(server, {
     cors: { origin: process.env.ORIGIN_URL },
