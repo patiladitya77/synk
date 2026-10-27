@@ -46,8 +46,12 @@ const initialiseSocket = (server: any) => {
         socket.emit("error", "Board not found");
         return;
       }
-
       const roomId = getBoardRoomId(board.id);
+      socket.data.user = {
+        userId, name
+      }
+
+
 
       socket.join(roomId);
       const shapes = await prisma.shape.findMany({
