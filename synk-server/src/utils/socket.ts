@@ -66,6 +66,7 @@ const initialiseSocket = (server: any) => {
           return { ...shapeData, id: s.id };
         }),
       );
+      await broadcastPresence(io, roomId);
     });
 
     // Draw shape
