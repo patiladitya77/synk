@@ -198,8 +198,18 @@ const initialiseSocket = (server: any) => {
       io.to(roomId).emit("boardCleared");
     });
 
-    socket.on("disconnect", () => {
-      // console.log("User disconnected:", socket.id);
+    socket.on("disconnecting", async () => {
+      console.log("[presence] disconnecting:", socket.data.user, "| socketId:", socket.id);
+      // socket.rooms still contains the board rooms at this point
+      const rooms = [...socket.rooms];
+
+      for (const roomId of rooms) {
+        // Every socket is also in a personal room named after its own ID — skip it
+        if (roomId === socket.id) continue;
+
+        console.log("[presence] broadcasting after leave for room:", roomId);
+        await broadcastPresence(io, roomId, socket.id);
+      }
     });
   });
 };
