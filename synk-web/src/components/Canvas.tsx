@@ -36,6 +36,8 @@ import {
 } from "@/canvas-engine/geometry";
 import { RESIZE_CURSORS, screenToWorld } from "@/canvas-engine/interaction";
 
+type ConnectedUser = { userId: string; name: string };
+
 export default function Canvas() {
   // Add these refs at the top of Canvas()
   const commandManagerRef = useRef(new CommandManager());
@@ -52,6 +54,7 @@ export default function Canvas() {
   const editingStartSnapshotRef = useRef<TextShape | null>(null);
   const editingTextShapeRef = useRef<TextShape | null>(null);
   const [editingTextShape, setEditingTextShape] = useState<TextShape | null>(null);
+  const [connectedUsers, setConnectedUsers] = useState<ConnectedUser[]>([]);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
