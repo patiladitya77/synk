@@ -174,6 +174,11 @@ export default function Canvas() {
       });
     });
 
+    socket.on("presence:update", (users: ConnectedUser[]) => {
+      console.log("[presence] received update:", users);
+      setConnectedUsers(users);
+    });
+
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
     const DPR = window.devicePixelRatio || 1;
@@ -745,6 +750,7 @@ export default function Canvas() {
           setActiveTool("text");
         }}
         activeTool={activeTool}
+        connectedUsers={connectedUsers}
       />
 
       {/* Editing Textarea */}
