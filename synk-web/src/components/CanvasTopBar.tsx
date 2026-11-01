@@ -1,3 +1,5 @@
+type ConnectedUser = { userId: string; name: string };
+
 type CanvasTopBarProps = {
   onSelectRect: () => void;
   onSelectCircle: () => void;
@@ -5,6 +7,18 @@ type CanvasTopBarProps = {
   onSelectDiamond: () => void;
   onSelectText: () => void;
   activeTool: "rect" | "oval" | "arrow" | "diamond" | "text";
+  connectedUsers?: ConnectedUser[];
+};
+
+/** Deterministic colour from a userId string */
+const avatarColour = (userId: string) => {
+  const colours = [
+    "#f87171", "#fb923c", "#fbbf24", "#34d399",
+    "#38bdf8", "#818cf8", "#e879f9", "#f472b6",
+  ];
+  let hash = 0;
+  for (let i = 0; i < userId.length; i++) hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+  return colours[Math.abs(hash) % colours.length];
 };
 
 const CanvasTopBar = ({
@@ -14,6 +28,7 @@ const CanvasTopBar = ({
   onSelectDiamond,
   onSelectText,
   activeTool,
+  connectedUsers = [],
 }: CanvasTopBarProps) => {
   const base =
     "w-10 h-10 border text-black rounded p-1 hover:bg-gray-100 transition-colors flex items-center justify-center";
@@ -127,6 +142,30 @@ const CanvasTopBar = ({
           />
         </svg>
       </button>
+
+      {/* Presence avatars */}
+      {connectedUsers.length > 0 && (
+        <>
+          <div className="w-px h-6 bg-gray-200 mx-1" />
+          <div className="flex items-center -space-x-2">
+            {connectedUsers.slice(0, 5).map((u) => (
+              <div
+                key={u.userId}
+                title={u.name}
+                style={{ backgroundColor: avatarColour(u.userId) }}
+                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold ring-2 ring-white select-none"
+              >
+                {u.name.charAt(0).toUpperCase()}
+              </div>
+            ))}
+            {connectedUsers.length > 5 && (
+              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-xs font-semibold ring-2 ring-white">
+                +{connectedUsers.length - 5}
+              </div>
+            )}
+          </div>
+        </>
+      )}
     </div>
   );
 };
