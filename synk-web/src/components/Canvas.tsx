@@ -686,6 +686,11 @@ export default function Canvas() {
           );
           commandManagerRef.current.execute(cmd);
 
+          // Add the placeholder immediately so the shape is visible during editing
+          // and mutations to this object (text, width, height) are reflected on render.
+          // The shapeDrawn handler will patch in the server-assigned id in-place.
+          shapesRef.current = [...shapesRef.current, textShape];
+
           startEditingText(textShape);
           render({
             ctx,
