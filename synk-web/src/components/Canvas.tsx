@@ -145,7 +145,27 @@ export default function Canvas() {
     });
 
     socket.on("shapeDrawn", (shape: Shape) => {
-      shapesRef.current.push(shape);
+      // If we have a local placeholder (id: "") for this shape, patch it in-place
+      // so that any text the user already typed is preserved and not overwritten.
+      // Only x/y-based shapes (rect, oval, diamond, text) are created as placeholders.
+      const hasXY = (s: Shape): s is Extract<Shape, { x: number; y: number }> =>
+        s.type !== "line" && s.type !== "arrow";
+
+      const placeholderIndex =
+        hasXY(shape)
+          ? shapesRef.current.findIndex(
+              (s) => s.id === "" && s.type === shape.type && hasXY(s) && s.x === shape.x && s.y === shape.y
+            )
+          : -1;
+
+      if (placeholderIndex !== -1) {
+        // Assign the server id to the placeholder object (same reference in memory)
+        // so editingTextShapeRef.current (which points to it) gets the real id too.
+        const placeholder = shapesRef.current[placeholderIndex] as Record<string, unknown>;
+        placeholder["id"] = shape.id;
+      } else {
+        shapesRef.current.push(shape);
+      }
 
       render({
         ctx,
