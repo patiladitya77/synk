@@ -845,7 +845,10 @@ export default function Canvas() {
                 );
               }
             } else {
-              if (startSnapshot && socket) {
+              // Only save if the server has already assigned a real id.
+              // If shapeDrawn hasn't come back yet (id still ""), skip the update —
+              // the drawShape already persisted the shape; we just can't updateShape yet.
+              if (startSnapshot && socket && target.id) {
                 const updateCmd = new UpdateShapeCommand(
                   shapesRef,
                   boardId!,
