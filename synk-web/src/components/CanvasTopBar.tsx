@@ -8,6 +8,11 @@ type CanvasTopBarProps = {
   onSelectText: () => void;
   activeTool: "rect" | "oval" | "arrow" | "diamond" | "text";
   connectedUsers?: ConnectedUser[];
+  currentUserId?: string;
+  zoom?: number;
+  onZoomIn?: () => void;
+  onZoomOut?: () => void;
+  onZoomReset?: () => void;
 };
 
 /** Deterministic colour from a userId string */
@@ -29,6 +34,11 @@ const CanvasTopBar = ({
   onSelectText,
   activeTool,
   connectedUsers = [],
+  currentUserId,
+  zoom = 1,
+  onZoomIn,
+  onZoomOut,
+  onZoomReset,
 }: CanvasTopBarProps) => {
   const base =
     "w-10 h-10 border text-black rounded p-1 hover:bg-gray-100 transition-colors flex items-center justify-center";
@@ -148,24 +158,63 @@ const CanvasTopBar = ({
         <>
           <div className="w-px h-6 bg-gray-200 mx-1" />
           <div className="flex items-center -space-x-2">
-            {connectedUsers.slice(0, 5).map((u) => (
+            {connectedUsers.slice(0, 3).map((u) => {
+              const isSelf = u.userId === currentUserId;
+              return (
+                <div
+                  key={u.userId}
+                  title={isSelf ? `${u.name} (You)` : u.name}
+                  style={{ backgroundColor: avatarColour(u.userId) }}
+                  className={`w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold select-none ${isSelf
+                      ? "ring-2 ring-green-400 ring-offset-1"
+                      : "ring-2 ring-white"
+                    }`}
+                >
+                  {u.name.charAt(0).toUpperCase()}
+                </div>
+              );
+            })}
+            {connectedUsers.length > 3 && (
               <div
-                key={u.userId}
-                title={u.name}
-                style={{ backgroundColor: avatarColour(u.userId) }}
-                className="w-8 h-8 rounded-full flex items-center justify-center text-white text-xs font-semibold ring-2 ring-white select-none"
+                className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-xs font-semibold ring-2 ring-white cursor-default"
+                title={connectedUsers.slice(3).map((u) => u.name).join(", ")}
               >
-                {u.name.charAt(0).toUpperCase()}
-              </div>
-            ))}
-            {connectedUsers.length > 5 && (
-              <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 text-xs font-semibold ring-2 ring-white">
-                +{connectedUsers.length - 5}
+                +{connectedUsers.length - 3}
               </div>
             )}
           </div>
         </>
       )}
+
+      {/* Zoom controls */}
+      <div className="w-px h-6 bg-gray-200 mx-1" />
+      <div className="flex items-center gap-1">
+        <button
+          onClick={onZoomOut}
+          className={`${base} ${inactive}`}
+          title="Zoom out"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M5 12h14" />
+          </svg>
+        </button>
+        <button
+          onClick={onZoomReset}
+          className="h-8 px-2 text-xs font-medium border border-gray-200 bg-white rounded hover:bg-gray-100 transition-colors min-w-[46px] text-black"
+          title="Reset zoom to 100%"
+        >
+          {Math.round(zoom * 100)}%
+        </button>
+        <button
+          onClick={onZoomIn}
+          className={`${base} ${inactive}`}
+          title="Zoom in"
+        >
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" strokeWidth={1.5} stroke="currentColor" className="size-4">
+            <path strokeLinecap="round" strokeLinejoin="round" d="M12 4.5v15m7.5-7.5h-15" />
+          </svg>
+        </button>
+      </div>
     </div>
   );
 };

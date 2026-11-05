@@ -776,6 +776,29 @@ export default function Canvas() {
         }}
         activeTool={activeTool}
         connectedUsers={connectedUsers}
+        currentUserId={user?.id}
+        zoom={zoom}
+        onZoomIn={() => {
+          const canvas = canvasRef.current!;
+          zoomAt(cameraRef.current, 1.25, canvas.clientWidth / 2, canvas.clientHeight / 2);
+          setZoom(cameraRef.current.zoom);
+          const ctx = canvas.getContext("2d")!;
+          render({ ctx, canvas, camera: cameraRef.current, shapes: shapesRef.current, selectedShape: selectedShapeRef.current });
+        }}
+        onZoomOut={() => {
+          const canvas = canvasRef.current!;
+          zoomAt(cameraRef.current, 0.8, canvas.clientWidth / 2, canvas.clientHeight / 2);
+          setZoom(cameraRef.current.zoom);
+          const ctx = canvas.getContext("2d")!;
+          render({ ctx, canvas, camera: cameraRef.current, shapes: shapesRef.current, selectedShape: selectedShapeRef.current });
+        }}
+        onZoomReset={() => {
+          cameraRef.current = { x: 0, y: 0, zoom: 1 };
+          setZoom(1);
+          const canvas = canvasRef.current!;
+          const ctx = canvas.getContext("2d")!;
+          render({ ctx, canvas, camera: cameraRef.current, shapes: shapesRef.current, selectedShape: selectedShapeRef.current });
+        }}
       />
 
       {/* Editing Textarea */}
