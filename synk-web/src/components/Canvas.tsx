@@ -740,7 +740,16 @@ export default function Canvas() {
       canvas.removeEventListener("dblclick", onDblClick);
       canvas.removeEventListener("wheel", onWheel);
       window.removeEventListener("keydown", onKeyDown);
-      // socket.disconnect();
+
+      // Remove socket listeners and disconnect
+      socket.off("initialstate");
+      socket.off("shapeDeleted");
+      socket.off("shapeDrawn");
+      socket.off("shapeUpdated");
+      socket.off("presence:update");
+      socket.off("boardCleared");
+      socket.off("cursor:move");
+      socket.disconnect();
     };
   }, [user, boardId]);
 
