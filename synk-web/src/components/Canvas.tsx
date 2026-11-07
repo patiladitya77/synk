@@ -199,6 +199,21 @@ export default function Canvas() {
       setConnectedUsers(users);
     });
 
+    socket.on("boardCleared", () => {
+      shapesRef.current = [];
+      render({
+        ctx,
+        canvas,
+        camera: cameraRef.current,
+        shapes: shapesRef.current,
+        selectedShape: selectedShapeRef.current,
+      });
+    });
+
+    socket.on("cursor:move", (cursor: RemoteCursor) => {
+      remoteCursorsRef.current.set(cursor.userId, cursor);
+    });
+
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
     const DPR = window.devicePixelRatio || 1;
