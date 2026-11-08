@@ -38,6 +38,8 @@ import { RESIZE_CURSORS, screenToWorld } from "@/canvas-engine/interaction";
 
 type ConnectedUser = { userId: string; name: string };
 
+type RemoteCursor = { userId: string; name: string; x: number; y: number };
+
 export default function Canvas() {
   // Add these refs at the top of Canvas()
   const commandManagerRef = useRef(new CommandManager());
@@ -101,6 +103,8 @@ export default function Canvas() {
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const shapesRef = useRef<Shape[]>([]);
+  const remoteCursorsRef = useRef<Map<string, RemoteCursor>>(new Map());
+  const cursorThrottleRef = useRef<number>(0);
   function setCursor(cursor: string) {
     if (canvasRef.current) {
       canvasRef.current.style.cursor = cursor;
@@ -406,6 +410,13 @@ export default function Canvas() {
       }
 
       const { x, y } = screenToWorld(e, canvas, cameraRef.current);
+
+      // Throttled cursor broadcast (~30ms)
+      const now = Date.now();
+      if (now - cursorThrottleRef.current > 30 && boardId) {
+        cursorThrottleRef.current = now;
+        socket.emit("cursor:move", { boardId, x, y });
+      }
 
       if (isDrawingArrowRef.current && arrowDraftRef.current) {
         setCursor("crosshair");
@@ -748,6 +759,8 @@ export default function Canvas() {
     window.addEventListener("keydown", onKeyDown);
 
     return () => {
+      // Remove DOM listeners
+      cancelAnimationFrame(rafId);
       window.removeEventListener("resize", resize);
       canvas.removeEventListener("mousedown", onMouseDown);
       canvas.removeEventListener("mousemove", onMouseMove);

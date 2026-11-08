@@ -50,6 +50,7 @@ const initialiseSocket = (server: any) => {
       socket.data.user = {
         userId, name
       }
+      socket.data.roomId = roomId;
 
 
 
@@ -197,6 +198,22 @@ const initialiseSocket = (server: any) => {
       });
       io.to(roomId).emit("boardCleared");
     });
+
+    // Relay cursor position to other users in the same room (no DB write)
+    socket.on(
+      "cursor:move",
+      ({ x, y }: { boardId: string; x: number; y: number }) => {
+        const user = socket.data.user;
+        const roomId = socket.data.roomId;
+        if (!user || !roomId) return;
+        socket.to(roomId).emit("cursor:move", {
+          userId: user.userId,
+          name: user.name,
+          x,
+          y,
+        });
+      },
+    );
 
     socket.on("disconnecting", async () => {
       console.log("[presence] disconnecting:", socket.data.user, "| socketId:", socket.id);
