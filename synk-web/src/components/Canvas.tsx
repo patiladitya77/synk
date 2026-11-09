@@ -243,12 +243,32 @@ export default function Canvas() {
     };
 
     const onKeyDown = (e: KeyboardEvent) => {
+      // Escape while editing text: blur the textarea (triggers onBlur save/delete logic)
+      if (e.key === "Escape" && editingTextShapeRef.current) {
+        textareaRef.current?.blur();
+        return;
+      }
+
       if (
         e.target instanceof HTMLTextAreaElement ||
         e.target instanceof HTMLInputElement
       ) {
         return;
       }
+
+      // Escape with a shape selected: deselect it
+      if (e.key === "Escape" && selectedShapeRef.current) {
+        selectedShapeRef.current = null;
+        render({
+          ctx,
+          canvas,
+          camera: cameraRef.current,
+          shapes: shapesRef.current,
+          selectedShape: null,
+        });
+        return;
+      }
+
       const isMac = navigator.platform.toUpperCase().includes("MAC");
       const ctrl = isMac ? e.metaKey : e.ctrlKey;
 
@@ -748,6 +768,55 @@ export default function Canvas() {
         }
       }
     };
+
+    // ── Remote cursor overlay (rAF loop, screen-space) ────────────────────
+    // Helper to derive avatar colour (same palette as CanvasTopBar)
+    const avatarColour = (userId: string) => {
+      const colours = [
+        "#f87171", "#fb923c", "#fbbf24", "#34d399",
+        "#38bdf8", "#818cf8", "#e879f9", "#f472b6",
+      ];
+      let hash = 0;
+      for (let i = 0; i < userId.length; i++)
+        hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+      return colours[Math.abs(hash) % colours.length];
+    };
+
+    const drawRemoteCursors = () => {
+      const camera = cameraRef.current;
+      ctx.save();
+      remoteCursorsRef.current.forEach((cursor) => {
+        // World → screen
+        const sx = cursor.x * camera.zoom + camera.x;
+        const sy = cursor.y * camera.zoom + camera.y;
+        const colour = avatarColour(cursor.userId);
+
+        // Small filled circle
+        ctx.beginPath();
+        ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+        ctx.fillStyle = colour;
+        ctx.fill();
+
+        // Name label
+        ctx.font = "bold 11px sans-serif";
+        const pad = 4;
+        const tw = ctx.measureText(cursor.name).width;
+        ctx.fillStyle = colour;
+        ctx.beginPath();
+        ctx.roundRect(sx + 8, sy - 8, tw + pad * 2, 18, 4);
+        ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(cursor.name, sx + 8 + pad, sy + 4);
+      });
+      ctx.restore();
+    };
+
+    let rafId: number;
+    const cursorLoop = () => {
+      drawRemoteCursors();
+      rafId = requestAnimationFrame(cursorLoop);
+    };
+    rafId = requestAnimationFrame(cursorLoop);
 
     resize();
     window.addEventListener("resize", resize);
