@@ -57,6 +57,7 @@ export default function Canvas() {
   const editingTextShapeRef = useRef<TextShape | null>(null);
   const [editingTextShape, setEditingTextShape] = useState<TextShape | null>(null);
   const [connectedUsers, setConnectedUsers] = useState<ConnectedUser[]>([]);
+  const [zoom, setZoom] = useState(1);
   const textareaRef = useRef<HTMLTextAreaElement | null>(null);
 
   useEffect(() => {
@@ -317,6 +318,34 @@ export default function Canvas() {
           camera: cameraRef.current,
           shapes: shapesRef.current,
           selectedShape: selectedShapeRef.current,
+        });
+      }
+
+      // Ctrl/Cmd + Shift + D — duplicate selected shape
+      if (ctrl && e.shiftKey && e.key.toLowerCase() === "d" && selectedShapeRef.current) {
+        e.preventDefault();
+        const src = selectedShapeRef.current;
+        const OFFSET = 20;
+
+        // Build a copy offset by +20px; handle arrow (x1/y1/x2/y2) vs regular (x/y)
+        let duplicate: Shape;
+        if (src.type === "arrow") {
+          duplicate = { ...src, id: "", x1: src.x1 + OFFSET, y1: src.y1 + OFFSET, x2: src.x2 + OFFSET, y2: src.y2 + OFFSET };
+        } else {
+          duplicate = { ...src, id: "", x: src.x + OFFSET, y: src.y + OFFSET };
+        }
+
+        // Execute via CommandManager — emits drawShape; server echoes shapeDrawn which adds it to shapesRef
+        const cmd = new AddShapeCommand(shapesRef, boardId!, socket, duplicate, user.id);
+        commandManagerRef.current.execute(cmd);
+        selectedShapeRef.current = duplicate;
+
+        render({
+          ctx,
+          canvas,
+          camera: cameraRef.current,
+          shapes: shapesRef.current,
+          selectedShape: duplicate,
         });
       }
     };
