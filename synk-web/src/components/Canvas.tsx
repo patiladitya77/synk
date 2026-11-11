@@ -327,9 +327,9 @@ export default function Canvas() {
         const src = selectedShapeRef.current;
         const OFFSET = 20;
 
-        // Build a copy offset by +20px; handle arrow (x1/y1/x2/y2) vs regular (x/y)
+        // Build a copy offset by +20px; handle line/arrow (x1/y1/x2/y2) vs regular (x/y)
         let duplicate: Shape;
-        if (src.type === "arrow") {
+        if (src.type === "arrow" || src.type === "line") {
           duplicate = { ...src, id: "", x1: src.x1 + OFFSET, y1: src.y1 + OFFSET, x2: src.x2 + OFFSET, y2: src.y2 + OFFSET };
         } else {
           duplicate = { ...src, id: "", x: src.x + OFFSET, y: src.y + OFFSET };
