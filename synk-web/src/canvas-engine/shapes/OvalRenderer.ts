@@ -1,5 +1,6 @@
 import { ShapeRenderer } from "../shapeRenderer";
 import { OvalShape } from "../types/OvalShape";
+import { drawBoundingBoxSelection } from "./selectionHelper";
 
 export const ovalRenderer: ShapeRenderer<OvalShape> = {
   draw(ctx, shape) {
@@ -17,14 +18,7 @@ export const ovalRenderer: ShapeRenderer<OvalShape> = {
     ctx.stroke();
   },
 
-  drawSelection(ctx, shape) {
-    const cx = shape.x + shape.width / 2;
-    const cy = shape.y + shape.height / 2;
-    const rx = shape.width / 2;
-    const ry = shape.height / 2;
-
-    ctx.beginPath();
-    ctx.ellipse(cx, cy, Math.abs(rx), Math.abs(ry), 0, 0, Math.PI * 2);
-    ctx.stroke();
+  drawSelection(ctx, shape, zoom = 1) {
+    drawBoundingBoxSelection(ctx, shape, zoom);
   },
 };

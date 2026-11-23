@@ -16,8 +16,12 @@ const canvasSlice = createSlice({
     setUserCanvases: (state, action: PayloadAction<ICanvas[]>) => {
       state.canvases = action.payload;
     },
+    removeUserCanvases: (state, action) => {
+      state.canvases =
+        state.canvases?.filter((c) => c.id != action.payload) ?? null;
+    },
   },
 });
 
-export const { setUserCanvases } = canvasSlice.actions;
+export const { setUserCanvases, removeUserCanvases } = canvasSlice.actions;
 export default canvasSlice.reducer;

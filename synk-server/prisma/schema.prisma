@@ -19,10 +19,6 @@ model User {
   avatarUrl   String?
   lastLoginAt DateTime?
 
-  resetOtp       String?
-  resetOtpExpiry DateTime?
-  otpAttempts    Int       @default(0)
-
   createdAt DateTime @default(now())
   updatedAt DateTime @updatedAt
 
@@ -37,6 +33,7 @@ model Board {
   title           String
   slug            String
   isArchived      Boolean @default(false)
+  archivedAt      DateTime?
   inviteToken     String?
   isInviteEnabled Boolean @default(true)
   inviteTokenExpiresAt DateTime?
@@ -50,6 +47,7 @@ model Board {
   updatedAt DateTime @updatedAt
 
   @@unique([ownerId, slug])
+  operations BoardOperation[]
 }
 
 model BoardCollaborator {
@@ -123,12 +121,13 @@ model Session {
 }
 model BoardOperation {
   id        String   @id @default(uuid())
-  boardId   String
+  boardId   String   @db.Uuid
   type      String
   payload   Json
   createdAt DateTime @default(now())
 
   @@index([boardId])
+  board Board @relation(fields: [boardId], references: [id], onDelete: Cascade)
 }
 
 enum BoardRole {
@@ -137,6 +136,5 @@ enum BoardRole {
 }
 
 enum AuthType {
-  password
   google
 }

@@ -6,10 +6,10 @@ export const createBoardController = async (req: Request, res: Response) => {
   try {
     const user = req.user;
     if (!user) {
-      return res.json({ message: "User does not exist" });
+      return res.status(401).json({ message: "User does not exist" });
     }
     const { title } = req.body;
-    if (!title) return res.json({ message: "title requried" });
+    if (!title) return res.status(400).json({ message: "title requried" });
     const slug = generateSlug(title);
     const savedBoard = await prisma.board.create({
       data: {
@@ -46,7 +46,7 @@ export const getAllBoardsController = async (req: Request, res: Response) => {
   try {
     const user = req.user;
     if (!user) {
-      return res.json({ message: "User does not exist" });
+      return res.status(401).json({ message: "User does not exist" });
     }
     const boards = await prisma.board.findMany({
       where: {
@@ -117,7 +117,7 @@ export const generateInviteLinkController = async (
     const { boardId } = req.params;
     const user = req.user;
     if (!user) {
-      return res.json({ message: "user does not exists" });
+      return res.status(401).json({ message: "user does not exists" });
     }
     const board = await prisma.board.findUnique({ where: { id: boardId } });
     if (!board || board.ownerId !== user.id) {
@@ -162,14 +162,11 @@ export const generateInviteLinkController = async (
 
 export const acceptInviteController = async (req: Request, res: Response) => {
   try {
-    console.log("control reached");
     const { token } = req.params;
-    console.log("token: ", token);
     const user = req.user;
     if (!user) {
-      return res.json("User does not exixts");
+      return res.status(401).json("User does not exixts");
     }
-    console.log("user: ", user);
     const board = await prisma.board.findFirst({
       where: {
         inviteToken: token,
@@ -179,7 +176,6 @@ export const acceptInviteController = async (req: Request, res: Response) => {
         },
       },
     });
-    console.log("query one sucess");
     if (!board) {
       return res.status(400).json("Invalid or expired invite link");
     }
@@ -197,9 +193,73 @@ export const acceptInviteController = async (req: Request, res: Response) => {
         role: "EDITOR",
       },
     });
-    console.log("accept invite api ran successfully");
     res.json({ message: "Invite accepted successfully", boardId: board.slug });
   } catch (error) {
     return res.status(500).json({ error: "Something went wrong" });
+  }
+};
+
+export const archiveBoardController = async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "User does not exist" });
+    const boardId = req.params.boardId;
+
+    const board = await prisma.board.findFirst({
+      where: {
+        id: boardId,
+        ownerId: user.id,
+        isArchived: false,
+      },
+    });
+
+    if (!board)
+      return res.status(404).json({ message: "Board does not exists" });
+    await prisma.board.update({
+      where: {
+        id: boardId,
+      },
+      data: {
+        isArchived: true,
+        archivedAt: new Date(),
+      },
+    });
+
+    return res.status(200).json({ message: "sucess!" });
+  } catch (err) {
+    res.status(400).json({ message: "Failed to archive-  " + err });
+  }
+};
+
+export const restoreBoardController = async (req: Request, res: Response) => {
+  try {
+    const user = req.user;
+    if (!user) return res.status(401).json({ message: "user not found" });
+    const { boardId } = req.params;
+    const thirtyDaysAgo = new Date(Date.now() - 30 * 24 * 60 * 60 * 1000);
+    const board = await prisma.board.findFirst({
+      where: {
+        id: boardId,
+        ownerId: user.id,
+        isArchived: true,
+        archivedAt: {
+          gte: thirtyDaysAgo,
+        },
+      },
+    });
+    if (!board) return res.status(404).json({ message: "board not found" });
+
+    await prisma.board.update({
+      where: {
+        id: boardId,
+      },
+      data: {
+        isArchived: false,
+        archivedAt: null,
+      },
+    });
+    return res.status(200).json({ message: "success" });
+  } catch (err) {
+    res.status(500).json({ message: "Failed to restore-  " + err });
   }
 };

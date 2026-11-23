@@ -1,4 +1,5 @@
 .env
 node_modules
 takedown.md
+problems.md
 /src/generated/prisma

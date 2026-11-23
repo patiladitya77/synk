@@ -33,7 +33,7 @@ export default function InvitePage() {
     );
     console.log(res);
     const boardId = res.data.boardId;
-    router.push("http://localhost:3000/workspace/" + boardId);
+    router.push(`/workspace/${boardId}`);
   };
 
   return <div>Joining board</div>;

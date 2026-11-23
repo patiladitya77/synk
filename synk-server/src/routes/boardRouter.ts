@@ -1,10 +1,12 @@
 import express from "express";
 import {
   acceptInviteController,
+  archiveBoardController,
   checkName,
   createBoardController,
   generateInviteLinkController,
   getAllBoardsController,
+  restoreBoardController,
 } from "../controllers/boardController";
 import { userAuth } from "../middleware/userAuth";
 const boardRouter = express.Router();
@@ -18,5 +20,7 @@ boardRouter.post(
   generateInviteLinkController,
 );
 boardRouter.post("/invite/:token", userAuth, acceptInviteController);
+boardRouter.delete("/archive/:boardId", userAuth, archiveBoardController);
+boardRouter.post("/restore/:boardId", userAuth, restoreBoardController);
 
 export default boardRouter;

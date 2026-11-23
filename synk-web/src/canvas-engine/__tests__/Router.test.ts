@@ -1,9 +1,9 @@
 import {
   getPortPosition,
   findNearestPort,
-  routeArrow,
   resolveEndpoint,
-} from "../Router";
+} from "../arrowPorts";
+import { routeArrow } from "../arrowRouter";
 import { Shape } from "../types";
 import { ArrowShape } from "../types/ArrowShape";
 import {

@@ -15,13 +15,30 @@ import { MoveShapeCommand } from "@/canvas-engine/commands/MoveShapeCommand";
 import { AddShapeCommand } from "@/canvas-engine/commands/AddShapeCommand";
 import { DeleteShapeCommand } from "@/canvas-engine/commands/DeleteShapeCommand";
 import { ResizeShapeCommand } from "@/canvas-engine/commands/ResizeShapeCommand";
+import { UpdateShapeCommand } from "@/canvas-engine/commands/UpdateShapeCommand";
 import { ArrowShape } from "@/canvas-engine/types/ArrowShape";
+import { TextShape } from "@/canvas-engine/types/TextShape";
+import { calculateTextDimensions, LINE_HEIGHT_MULTIPLIER } from "@/canvas-engine/textUtils";
+import { Socket } from "socket.io-client";
 import {
-  arrowToolGetPreview,
-  arrowToolMouseDown,
-  arrowToolMouseUp,
+  ArrowDraft,
+  createArrow,
+  createArrowDraft,
+  getArrowPreview,
 } from "@/canvas-engine/tools/ArrowTool";
-import { hitTestArrow } from "@/canvas-engine/Arrow";
+import {
+  findShapeAt,
+  getResizeHandle,
+  hitTestShape,
+  ResizeHandle,
+  resizeShape,
+  resizeTextShapeProportional,
+} from "@/canvas-engine/geometry";
+import { RESIZE_CURSORS, screenToWorld } from "@/canvas-engine/interaction";
+
+type ConnectedUser = { userId: string; name: string };
+
+type RemoteCursor = { userId: string; name: string; x: number; y: number };
 
 export default function Canvas() {
   // Add these refs at the top of Canvas()
@@ -32,11 +49,22 @@ export default function Canvas() {
   const isDraggingRef = useRef(false);
   const isResizingRef = useRef(false);
 
-  const resizeHandleRef = useRef<
-    "tl" | "tm" | "tr" | "mr" | "br" | "bm" | "bl" | "ml" | null
-  >(null);
+  const resizeHandleRef = useRef<ResizeHandle | null>(null);
   const resizeStartShapeSnapshotRef = useRef<Shape | null>(null);
   const dragStartRef = useRef({ x: 0, y: 0 });
+  const socketRef = useRef<Socket | null>(null);
+  const editingStartSnapshotRef = useRef<TextShape | null>(null);
+  const editingTextShapeRef = useRef<TextShape | null>(null);
+  const [editingTextShape, setEditingTextShape] = useState<TextShape | null>(null);
+  const [connectedUsers, setConnectedUsers] = useState<ConnectedUser[]>([]);
+  const [zoom, setZoom] = useState(1);
+  const textareaRef = useRef<HTMLTextAreaElement | null>(null);
+
+  useEffect(() => {
+    if (editingTextShape && textareaRef.current) {
+      textareaRef.current.focus();
+    }
+  }, [editingTextShape]);
   const user = useSelector((store: RootState) => store.user.user);
   const params = useParams() as { slug?: string | string[] };
 
@@ -53,10 +81,11 @@ export default function Canvas() {
     | typeof TOOLS.rect
     | typeof TOOLS.oval
     | typeof TOOLS.diamond
+    | typeof TOOLS.text
     | typeof ARROW_TOOL_ID
   >(TOOLS.rect);
   const [activeTool, setActiveTool] = useState<
-    "rect" | "oval" | "arrow" | "diamond"
+    "rect" | "oval" | "arrow" | "diamond" | "text"
   >("rect");
 
   const cameraRef = useRef({
@@ -70,83 +99,26 @@ export default function Canvas() {
   const isPanningRef = useRef(false);
 
   const isDrawingArrowRef = useRef(false);
+  const arrowDraftRef = useRef<ArrowDraft | null>(null);
   const arrowPreviewRef = useRef<ArrowShape | null>(null);
 
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const shapesRef = useRef<Shape[]>([]);
+  const remoteCursorsRef = useRef<Map<string, RemoteCursor>>(new Map());
+  const cursorThrottleRef = useRef<number>(0);
   function setCursor(cursor: string) {
     if (canvasRef.current) {
       canvasRef.current.style.cursor = cursor;
     }
   }
 
-  function hitTest(shape: Shape, x: number, y: number) {
-    if (shape.type === "rect") {
-      return (
-        x >= shape.x &&
-        x <= shape.x + shape.width &&
-        y >= shape.y &&
-        y <= shape.y + shape.height
-      );
-    }
-    if (shape.type === "oval") {
-      // Point-in-ellipse test using bounding box
-      const cx = shape.x + shape.width / 2;
-      const cy = shape.y + shape.height / 2;
-      const rx = shape.width / 2;
-      const ry = shape.height / 2;
-      const dx = (x - cx) / rx;
-      const dy = (y - cy) / ry;
-      return dx * dx + dy * dy <= 1;
-    }
-    if (shape.type === "arrow") {
-      //delegate to the segment-distance hit test
-      return hitTestArrow(shape, x, y, shapesRef.current);
-    }
 
-    return false;
-  }
-  function getHandleAtPos(shape: Shape, x: number, y: number, zoom: number) {
-    if (shape.type === "arrow") return null;
-    const HANDLE_SIZE = 8 / zoom;
-    const H = HANDLE_SIZE / 2;
-
-    let bx: number, by: number, bw: number, bh: number;
-    if (shape.type === "rect") {
-      bx = shape.x;
-      by = shape.y;
-      bw = shape.width;
-      bh = shape.height;
-    } else {
-      bx = shape.x;
-      by = shape.y;
-      bw = shape.width;
-      bh = shape.height;
-    }
-
-    const handles = [
-      { id: "tl", x: bx, y: by },
-      { id: "tm", x: bx + bw / 2, y: by },
-      { id: "tr", x: bx + bw, y: by },
-      { id: "mr", x: bx + bw, y: by + bh / 2 },
-      { id: "br", x: bx + bw, y: by + bh },
-      { id: "bm", x: bx + bw / 2, y: by + bh },
-      { id: "bl", x: bx, y: by + bh },
-      { id: "ml", x: bx, y: by + bh / 2 },
-    ] as const;
-
-    for (const h of handles) {
-      if (x >= h.x - H && x <= h.x + H && y >= h.y - H && y <= h.y + H) {
-        return h.id;
-      }
-    }
-    return null;
-  }
 
   useEffect(() => {
     if (!user || !boardId) return;
 
     const socket = createSocketConnection();
+    socketRef.current = socket;
 
     socket.emit("joinboard", {
       name: user.name,
@@ -178,7 +150,27 @@ export default function Canvas() {
     });
 
     socket.on("shapeDrawn", (shape: Shape) => {
-      shapesRef.current.push(shape);
+      // If we have a local placeholder (id: "") for this shape, patch it in-place
+      // so that any text the user already typed is preserved and not overwritten.
+      // Only x/y-based shapes (rect, oval, diamond, text) are created as placeholders.
+      const hasXY = (s: Shape): s is Extract<Shape, { x: number; y: number }> =>
+        s.type !== "line" && s.type !== "arrow";
+
+      const placeholderIndex =
+        hasXY(shape)
+          ? shapesRef.current.findIndex(
+              (s) => s.id === "" && s.type === shape.type && hasXY(s) && s.x === shape.x && s.y === shape.y
+            )
+          : -1;
+
+      if (placeholderIndex !== -1) {
+        // Assign the server id to the placeholder object (same reference in memory)
+        // so editingTextShapeRef.current (which points to it) gets the real id too.
+        const placeholder = shapesRef.current[placeholderIndex] as Record<string, unknown>;
+        placeholder["id"] = shape.id;
+      } else {
+        shapesRef.current.push(shape);
+      }
 
       render({
         ctx,
@@ -207,6 +199,26 @@ export default function Canvas() {
       });
     });
 
+    socket.on("presence:update", (users: ConnectedUser[]) => {
+      console.log("[presence] received update:", users);
+      setConnectedUsers(users);
+    });
+
+    socket.on("boardCleared", () => {
+      shapesRef.current = [];
+      render({
+        ctx,
+        canvas,
+        camera: cameraRef.current,
+        shapes: shapesRef.current,
+        selectedShape: selectedShapeRef.current,
+      });
+    });
+
+    socket.on("cursor:move", (cursor: RemoteCursor) => {
+      remoteCursorsRef.current.set(cursor.userId, cursor);
+    });
+
     const canvas = canvasRef.current!;
     const ctx = canvas.getContext("2d")!;
     const DPR = window.devicePixelRatio || 1;
@@ -231,31 +243,33 @@ export default function Canvas() {
       });
     };
 
-    const RESIZE_CURSORS: Record<string, string> = {
-      tl: "nwse-resize",
-      tm: "ns-resize",
-      tr: "nesw-resize",
-      mr: "ew-resize",
-      br: "nwse-resize",
-      bm: "ns-resize",
-      bl: "nesw-resize",
-      ml: "ew-resize",
-    };
-
-    const getWorldPos = (e: MouseEvent) => {
-      const rect = canvas.getBoundingClientRect();
-      const { x, y, zoom } = cameraRef.current;
-
-      const screenX = e.clientX - rect.left;
-      const screenY = e.clientY - rect.top;
-
-      return {
-        x: (screenX - x) / zoom,
-        y: (screenY - y) / zoom,
-      };
-    };
-
     const onKeyDown = (e: KeyboardEvent) => {
+      // Escape while editing text: blur the textarea (triggers onBlur save/delete logic)
+      if (e.key === "Escape" && editingTextShapeRef.current) {
+        textareaRef.current?.blur();
+        return;
+      }
+
+      if (
+        e.target instanceof HTMLTextAreaElement ||
+        e.target instanceof HTMLInputElement
+      ) {
+        return;
+      }
+
+      // Escape with a shape selected: deselect it
+      if (e.key === "Escape" && selectedShapeRef.current) {
+        selectedShapeRef.current = null;
+        render({
+          ctx,
+          canvas,
+          camera: cameraRef.current,
+          shapes: shapesRef.current,
+          selectedShape: null,
+        });
+        return;
+      }
+
       const isMac = navigator.platform.toUpperCase().includes("MAC");
       const ctrl = isMac ? e.metaKey : e.ctrlKey;
 
@@ -306,10 +320,38 @@ export default function Canvas() {
           selectedShape: selectedShapeRef.current,
         });
       }
+
+      // Ctrl/Cmd + Shift + D — duplicate selected shape
+      if (ctrl && e.shiftKey && e.key.toLowerCase() === "d" && selectedShapeRef.current) {
+        e.preventDefault();
+        const src = selectedShapeRef.current;
+        const OFFSET = 20;
+
+        // Build a copy offset by +20px; handle line/arrow (x1/y1/x2/y2) vs regular (x/y)
+        let duplicate: Shape;
+        if (src.type === "arrow" || src.type === "line") {
+          duplicate = { ...src, id: "", x1: src.x1 + OFFSET, y1: src.y1 + OFFSET, x2: src.x2 + OFFSET, y2: src.y2 + OFFSET };
+        } else {
+          duplicate = { ...src, id: "", x: src.x + OFFSET, y: src.y + OFFSET };
+        }
+
+        // Execute via CommandManager — emits drawShape; server echoes shapeDrawn which adds it to shapesRef
+        const cmd = new AddShapeCommand(shapesRef, boardId!, socket, duplicate, user.id);
+        commandManagerRef.current.execute(cmd);
+        selectedShapeRef.current = duplicate;
+
+        render({
+          ctx,
+          canvas,
+          camera: cameraRef.current,
+          shapes: shapesRef.current,
+          selectedShape: duplicate,
+        });
+      }
     };
 
     const onMouseDown = (e: MouseEvent) => {
-      const { x, y } = getWorldPos(e);
+      const { x, y } = screenToWorld(e, canvas, cameraRef.current);
       if (e.button === 1) {
         // middle mouse
         isPanningRef.current = true;
@@ -318,14 +360,14 @@ export default function Canvas() {
       }
 
       if (activeToolRef.current === ARROW_TOOL_ID) {
-        arrowToolMouseDown(x, y, shapesRef.current);
+        arrowDraftRef.current = createArrowDraft(x, y, shapesRef.current);
         isDrawingArrowRef.current = true;
         selectedShapeRef.current = null; // deselect anything
         return;
       }
 
       if (selectedShapeRef.current) {
-        const handle = getHandleAtPos(
+        const handle = getResizeHandle(
           selectedShapeRef.current,
           x,
           y,
@@ -340,32 +382,26 @@ export default function Canvas() {
         }
       }
       // 1️ check if clicking on existing shape
-      let hitAnyShape = false;
+      const hitShape = findShapeAt(shapesRef.current, x, y);
+      if (hitShape) {
+        selectedShapeRef.current = hitShape;
+        isDraggingRef.current = true;
+        dragStartRef.current = { x, y };
+        dragStartShapeSnapshotRef.current = { ...hitShape };
+        setCursor("grabbing");
 
-      for (let i = shapesRef.current.length - 1; i >= 0; i--) {
-        const shape = shapesRef.current[i];
-
-        if (hitTest(shape, x, y)) {
-          selectedShapeRef.current = shape;
-          isDraggingRef.current = true;
-          dragStartRef.current = { x, y };
-          dragStartShapeSnapshotRef.current = { ...shape };
-          setCursor("grabbing");
-          hitAnyShape = true;
-
-          render({
-            ctx,
-            canvas,
-            camera: cameraRef.current,
-            shapes: shapesRef.current,
-            selectedShape: selectedShapeRef.current,
-          });
-          return;
-        }
+        render({
+          ctx,
+          canvas,
+          camera: cameraRef.current,
+          shapes: shapesRef.current,
+          selectedShape: selectedShapeRef.current,
+        });
+        return;
       }
 
       //  CLICKED EMPTY SPACE → UNSELECT
-      if (!hitAnyShape) {
+      if (!hitShape) {
         selectedShapeRef.current = null;
 
         render({
@@ -385,6 +421,7 @@ export default function Canvas() {
 
         // In onMouseDown, replace the raw socket.emit with:
         if (shape) {
+          selectedShapeRef.current = shape;
           const cmd = new AddShapeCommand(
             shapesRef,
             boardId!,
@@ -393,6 +430,10 @@ export default function Canvas() {
             user.id,
           );
           commandManagerRef.current.execute(cmd);
+
+          if (shape.type === "text") {
+            startEditingText(shape as TextShape);
+          }
         }
 
         isPlacingRef.current = false;
@@ -417,11 +458,23 @@ export default function Canvas() {
         lastPanRef.current = { x: e.clientX, y: e.clientY };
       }
 
-      const { x, y } = getWorldPos(e);
+      const { x, y } = screenToWorld(e, canvas, cameraRef.current);
 
-      if (isDrawingArrowRef.current) {
+      // Throttled cursor broadcast (~30ms)
+      const now = Date.now();
+      if (now - cursorThrottleRef.current > 30 && boardId) {
+        cursorThrottleRef.current = now;
+        socket.emit("cursor:move", { boardId, x, y });
+      }
+
+      if (isDrawingArrowRef.current && arrowDraftRef.current) {
         setCursor("crosshair");
-        const preview = arrowToolGetPreview(x, y, shapesRef.current);
+        const preview = getArrowPreview(
+          arrowDraftRef.current,
+          x,
+          y,
+          shapesRef.current,
+        );
         render({
           ctx,
           canvas,
@@ -443,7 +496,7 @@ export default function Canvas() {
         setCursor("grabbing");
       } else if (selectedShapeRef.current) {
         // Check if hovering a resize handle on the selected shape
-        const handle = getHandleAtPos(
+        const handle = getResizeHandle(
           selectedShapeRef.current,
           x,
           y,
@@ -451,7 +504,9 @@ export default function Canvas() {
         );
         if (handle) {
           setCursor(RESIZE_CURSORS[handle]);
-        } else if (hitTest(selectedShapeRef.current, x, y)) {
+        } else if (
+          hitTestShape(selectedShapeRef.current, x, y, shapesRef.current)
+        ) {
           // Hovering the shape body → 4-way move cursor
           setCursor("move");
         } else {
@@ -459,16 +514,9 @@ export default function Canvas() {
         }
       } else {
         // No selection — check if hovering any shape
-        let hoveringShape = false;
-        for (let i = shapesRef.current.length - 1; i >= 0; i--) {
-          if (hitTest(shapesRef.current[i], x, y)) {
-            hoveringShape = true;
-            break;
-          }
-        }
-        setCursor(hoveringShape ? "grab" : "default");
+        const hoverShape = findShapeAt(shapesRef.current, x, y);
+        setCursor(hoverShape ? "grab" : "default");
       }
-      let hoveringShape = false;
 
       if (
         isResizingRef.current &&
@@ -476,59 +524,28 @@ export default function Canvas() {
         resizeHandleRef.current
       ) {
         const handle = resizeHandleRef.current;
-        const shape = selectedShapeRef.current;
-        const dx = x - dragStartRef.current.x;
-        const dy = y - dragStartRef.current.y;
-        dragStartRef.current = { x, y };
+        const selected = selectedShapeRef.current;
 
-        // Both rect and oval use identical bounding-box resize logic now
-        if (shape.type === "rect" || shape.type === "oval") {
-          if (handle === "tl") {
-            shape.x += dx;
-            shape.y += dy;
-            shape.width -= dx;
-            shape.height -= dy;
-          }
-          if (handle === "tm") {
-            shape.y += dy;
-            shape.height -= dy;
-          }
-          if (handle === "tr") {
-            shape.y += dy;
-            shape.width += dx;
-            shape.height -= dy;
-          }
-          if (handle === "mr") {
-            shape.width += dx;
-          }
-          if (handle === "br") {
-            shape.width += dx;
-            shape.height += dy;
-          }
-          if (handle === "bm") {
-            shape.height += dy;
-          }
-          if (handle === "bl") {
-            shape.x += dx;
-            shape.width -= dx;
-            shape.height += dy;
-          }
-          if (handle === "ml") {
-            shape.x += dx;
-            shape.width -= dx;
-          }
+        if (
+          selected.type === "text" &&
+          resizeStartShapeSnapshotRef.current &&
+          (handle === "tl" || handle === "tr" || handle === "br" || handle === "bl")
+        ) {
+          const totalDx = x - dragStartRef.current.x;
+          const totalDy = y - dragStartRef.current.y;
+          resizeTextShapeProportional(
+            selected as TextShape,
+            resizeStartShapeSnapshotRef.current as TextShape,
+            handle,
+            totalDx,
+            totalDy,
+          );
+        } else {
+          const dx = x - dragStartRef.current.x;
+          const dy = y - dragStartRef.current.y;
+          dragStartRef.current = { x, y };
 
-          shape.width = Math.max(10, shape.width);
-          shape.height = Math.max(10, shape.height);
-        }
-      }
-
-      // hover detection (used only for render, cursor already set above)
-      for (let i = shapesRef.current.length - 1; i >= 0; i--) {
-        const shape = shapesRef.current[i];
-        if (hitTest(shape, x, y)) {
-          hoveringShape = true;
-          break;
+          resizeShape(selected, handle, dx, dy);
         }
       }
 
@@ -538,7 +555,12 @@ export default function Canvas() {
 
         const shape = selectedShapeRef.current;
 
-        if (shape.type === "rect" || shape.type === "oval") {
+        if (
+          shape.type === "rect" ||
+          shape.type === "oval" ||
+          shape.type === "diamond" ||
+          shape.type === "text"
+        ) {
           shape.x += dx;
           shape.y += dy;
         } else if (shape.type === "arrow") {
@@ -610,22 +632,31 @@ export default function Canvas() {
     };
 
     const onMouseUp = (e: MouseEvent) => {
-      const { x, y } = getWorldPos(e);
+      const { x, y } = screenToWorld(e, canvas, cameraRef.current);
 
       if (isDrawingArrowRef.current) {
         isDrawingArrowRef.current = false;
-        const arrow = arrowToolMouseUp(x, y, shapesRef.current, () =>
-          crypto.randomUUID(),
-        );
-        if (arrow) {
-          const cmd = new AddShapeCommand(
-            shapesRef,
-            boardId!,
-            socket,
-            arrow,
-            user.id,
+        const draft = arrowDraftRef.current;
+        arrowDraftRef.current = null;
+
+        if (draft) {
+          const arrow = createArrow(
+            draft,
+            x,
+            y,
+            shapesRef.current,
+            () => crypto.randomUUID(),
           );
-          commandManagerRef.current.execute(cmd);
+          if (arrow) {
+            const cmd = new AddShapeCommand(
+              shapesRef,
+              boardId!,
+              socket,
+              arrow,
+              user.id,
+            );
+            commandManagerRef.current.execute(cmd);
+          }
         }
         render({
           ctx,
@@ -648,8 +679,14 @@ export default function Canvas() {
         // Only record if the shape actually moved
         let didMove = false;
         if (
-          (after.type === "rect" || after.type === "oval") &&
-          (before.type === "rect" || before.type === "oval")
+          (after.type === "rect" ||
+            after.type === "oval" ||
+            after.type === "diamond" ||
+            after.type === "text") &&
+          (before.type === "rect" ||
+            before.type === "oval" ||
+            before.type === "diamond" ||
+            before.type === "text")
         ) {
           didMove = before.x !== after.x || before.y !== after.y;
         } else if (after.type === "arrow") {
@@ -660,25 +697,6 @@ export default function Canvas() {
         }
 
         if (didMove) {
-          const cmd = new MoveShapeCommand(
-            shapesRef,
-            boardId!,
-            socket,
-            before,
-            { ...after },
-          );
-          // Don't call cmd.execute() — the move already happened visually.
-          // Just push it into history so undo works.
-          // commandManagerRef.current["history"] = [
-          //   ...commandManagerRef.current["history"].slice(
-          //     0,
-          //     commandManagerRef.current["pointer"] + 1,
-          //   ),
-          //   cmd,
-          // ];
-          // commandManagerRef.current["pointer"]++;
-          // // Now sync to server
-          // socket.emit("updateShape", { boardId, shape: after });
           commandManagerRef.current.record(
             new MoveShapeCommand(shapesRef, boardId!, socket, before, {
               ...after,
@@ -705,35 +723,159 @@ export default function Canvas() {
           boardId,
           shape: selectedShapeRef.current,
         });
-        resizeStartShapeSnapshotRef.current = null;
       }
 
-      isResizingRef.current = false;
-      resizeHandleRef.current = null;
-
-      dragStartShapeSnapshotRef.current = null;
       isPanningRef.current = false;
       isDraggingRef.current = false;
       isResizingRef.current = false;
+      resizeHandleRef.current = null;
+      dragStartShapeSnapshotRef.current = null;
+      resizeStartShapeSnapshotRef.current = null;
       setCursor("default");
     };
+
+    const startEditingText = (shape: TextShape) => {
+      editingStartSnapshotRef.current = { ...shape };
+      editingTextShapeRef.current = shape;
+      setEditingTextShape({ ...shape });
+    };
+
+    const onDblClick = (e: MouseEvent) => {
+      if (e.button !== 0) return;
+      const { x, y } = screenToWorld(e, canvas, cameraRef.current);
+      const hitShape = findShapeAt(shapesRef.current, x, y);
+
+      if (hitShape) {
+        if (hitShape.type === "text") {
+          selectedShapeRef.current = hitShape;
+          startEditingText(hitShape as TextShape);
+          render({
+            ctx,
+            canvas,
+            camera: cameraRef.current,
+            shapes: shapesRef.current,
+            selectedShape: selectedShapeRef.current,
+          });
+        }
+      } else {
+        if (!isPlacingRef.current && activeToolRef.current !== ARROW_TOOL_ID) {
+          const textShape: TextShape = {
+            type: "text",
+            id: "",
+            x,
+            y,
+            width: 200,
+            height: 40,
+            text: "",
+            fontSize: 16,
+            fontFamily: "Arial",
+          };
+
+          selectedShapeRef.current = textShape;
+          const cmd = new AddShapeCommand(
+            shapesRef,
+            boardId!,
+            socket,
+            textShape,
+            user.id,
+          );
+          commandManagerRef.current.execute(cmd);
+
+          // Add the placeholder immediately so the shape is visible during editing
+          // and mutations to this object (text, width, height) are reflected on render.
+          // The shapeDrawn handler will patch in the server-assigned id in-place.
+          shapesRef.current = [...shapesRef.current, textShape];
+
+          startEditingText(textShape);
+          render({
+            ctx,
+            canvas,
+            camera: cameraRef.current,
+            shapes: shapesRef.current,
+            selectedShape: selectedShapeRef.current,
+          });
+        }
+      }
+    };
+
+    // ── Remote cursor overlay (rAF loop, screen-space) ────────────────────
+    // Helper to derive avatar colour (same palette as CanvasTopBar)
+    const avatarColour = (userId: string) => {
+      const colours = [
+        "#f87171", "#fb923c", "#fbbf24", "#34d399",
+        "#38bdf8", "#818cf8", "#e879f9", "#f472b6",
+      ];
+      let hash = 0;
+      for (let i = 0; i < userId.length; i++)
+        hash = userId.charCodeAt(i) + ((hash << 5) - hash);
+      return colours[Math.abs(hash) % colours.length];
+    };
+
+    const drawRemoteCursors = () => {
+      const camera = cameraRef.current;
+      ctx.save();
+      remoteCursorsRef.current.forEach((cursor) => {
+        // World → screen
+        const sx = cursor.x * camera.zoom + camera.x;
+        const sy = cursor.y * camera.zoom + camera.y;
+        const colour = avatarColour(cursor.userId);
+
+        // Small filled circle
+        ctx.beginPath();
+        ctx.arc(sx, sy, 5, 0, Math.PI * 2);
+        ctx.fillStyle = colour;
+        ctx.fill();
+
+        // Name label
+        ctx.font = "bold 11px sans-serif";
+        const pad = 4;
+        const tw = ctx.measureText(cursor.name).width;
+        ctx.fillStyle = colour;
+        ctx.beginPath();
+        ctx.roundRect(sx + 8, sy - 8, tw + pad * 2, 18, 4);
+        ctx.fill();
+        ctx.fillStyle = "#ffffff";
+        ctx.fillText(cursor.name, sx + 8 + pad, sy + 4);
+      });
+      ctx.restore();
+    };
+
+    let rafId: number;
+    const cursorLoop = () => {
+      drawRemoteCursors();
+      rafId = requestAnimationFrame(cursorLoop);
+    };
+    rafId = requestAnimationFrame(cursorLoop);
 
     resize();
     window.addEventListener("resize", resize);
     canvas.addEventListener("mousedown", onMouseDown);
     canvas.addEventListener("mousemove", onMouseMove);
     canvas.addEventListener("mouseup", onMouseUp);
+    canvas.addEventListener("dblclick", onDblClick);
     canvas.addEventListener("wheel", onWheel, { passive: false });
     window.addEventListener("keydown", onKeyDown);
 
     return () => {
+      // Remove DOM listeners
+      cancelAnimationFrame(rafId);
       window.removeEventListener("resize", resize);
       canvas.removeEventListener("mousedown", onMouseDown);
       canvas.removeEventListener("mousemove", onMouseMove);
       canvas.removeEventListener("mouseup", onMouseUp);
+      canvas.removeEventListener("dblclick", onDblClick);
       canvas.removeEventListener("wheel", onWheel);
       window.removeEventListener("keydown", onKeyDown);
-      // socket.disconnect();
+
+      // Remove socket listeners and disconnect
+      socket.off("initialstate");
+      socket.off("shapeDeleted");
+      socket.off("shapeDrawn");
+      socket.off("shapeUpdated");
+      socket.off("presence:update");
+      socket.off("boardCleared");
+      socket.off("cursor:move");
+      socket.disconnect();
     };
   }, [user, boardId]);
 
@@ -762,8 +904,156 @@ export default function Canvas() {
           isPlacingRef.current = true;
           setActiveTool("diamond");
         }}
+        onSelectText={() => {
+          activeToolRef.current = TOOLS.text;
+          isPlacingRef.current = true;
+          setActiveTool("text");
+        }}
         activeTool={activeTool}
+        connectedUsers={connectedUsers}
+        currentUserId={user?.id}
+        zoom={zoom}
+        onZoomIn={() => {
+          const canvas = canvasRef.current!;
+          zoomAt(cameraRef.current, 1.25, canvas.clientWidth / 2, canvas.clientHeight / 2);
+          setZoom(cameraRef.current.zoom);
+          const ctx = canvas.getContext("2d")!;
+          render({ ctx, canvas, camera: cameraRef.current, shapes: shapesRef.current, selectedShape: selectedShapeRef.current });
+        }}
+        onZoomOut={() => {
+          const canvas = canvasRef.current!;
+          zoomAt(cameraRef.current, 0.8, canvas.clientWidth / 2, canvas.clientHeight / 2);
+          setZoom(cameraRef.current.zoom);
+          const ctx = canvas.getContext("2d")!;
+          render({ ctx, canvas, camera: cameraRef.current, shapes: shapesRef.current, selectedShape: selectedShapeRef.current });
+        }}
+        onZoomReset={() => {
+          cameraRef.current = { x: 0, y: 0, zoom: 1 };
+          setZoom(1);
+          const canvas = canvasRef.current!;
+          const ctx = canvas.getContext("2d")!;
+          render({ ctx, canvas, camera: cameraRef.current, shapes: shapesRef.current, selectedShape: selectedShapeRef.current });
+        }}
       />
+
+      {/* Editing Textarea */}
+      {editingTextShape && (
+        <textarea
+          ref={textareaRef}
+          value={editingTextShape.text}
+          onChange={(e) => {
+            const newText = e.target.value;
+            const dims = calculateTextDimensions(
+              newText,
+              editingTextShape.fontSize,
+              editingTextShape.fontFamily,
+            );
+
+            editingTextShape.text = newText;
+            editingTextShape.width = dims.width;
+            editingTextShape.height = dims.height;
+
+            if (editingTextShapeRef.current) {
+              editingTextShapeRef.current.text = newText;
+              editingTextShapeRef.current.width = dims.width;
+              editingTextShapeRef.current.height = dims.height;
+            }
+
+            setEditingTextShape({ ...editingTextShape });
+
+            if (canvasRef.current) {
+              const ctx = canvasRef.current.getContext("2d");
+              if (ctx) {
+                render({
+                  ctx,
+                  canvas: canvasRef.current,
+                  camera: cameraRef.current,
+                  shapes: shapesRef.current,
+                  selectedShape: selectedShapeRef.current,
+                });
+              }
+            }
+          }}
+          onBlur={() => {
+            if (!editingTextShapeRef.current) return;
+            const target = editingTextShapeRef.current;
+            const startSnapshot = editingStartSnapshotRef.current;
+            const socket = socketRef.current;
+
+            editingTextShapeRef.current = null;
+            editingStartSnapshotRef.current = null;
+            setEditingTextShape(null);
+
+            if (!target.text || target.text.trim() === "") {
+              if (selectedShapeRef.current === target) {
+                selectedShapeRef.current = null;
+              }
+              if (socket) {
+                const deleteCmd = new DeleteShapeCommand(
+                  shapesRef,
+                  boardId!,
+                  socket,
+                  target,
+                  user?.id || "",
+                );
+                deleteCmd.execute();
+              } else {
+                shapesRef.current = shapesRef.current.filter(
+                  (s) => s.id !== target.id && s !== target,
+                );
+              }
+            } else {
+              // Only save if the server has already assigned a real id.
+              // If shapeDrawn hasn't come back yet (id still ""), skip the update —
+              // the drawShape already persisted the shape; we just can't updateShape yet.
+              if (startSnapshot && socket && target.id) {
+                const updateCmd = new UpdateShapeCommand(
+                  shapesRef,
+                  boardId!,
+                  socket,
+                  startSnapshot,
+                  { ...target },
+                );
+                commandManagerRef.current.record(updateCmd);
+                socket.emit("updateShape", { boardId, shape: target });
+              }
+            }
+
+            if (canvasRef.current) {
+              const ctx = canvasRef.current.getContext("2d");
+              if (ctx) {
+                render({
+                  ctx,
+                  canvas: canvasRef.current,
+                  camera: cameraRef.current,
+                  shapes: shapesRef.current,
+                  selectedShape: selectedShapeRef.current,
+                });
+              }
+            }
+          }}
+          style={{
+            position: "fixed",
+            left: `${cameraRef.current.x + editingTextShape.x * cameraRef.current.zoom}px`,
+            top: `${cameraRef.current.y + editingTextShape.y * cameraRef.current.zoom}px`,
+            width: `${editingTextShape.width * cameraRef.current.zoom}px`,
+            height: `${editingTextShape.height * cameraRef.current.zoom}px`,
+            fontSize: `${editingTextShape.fontSize * cameraRef.current.zoom}px`,
+            fontFamily: editingTextShape.fontFamily,
+            lineHeight: LINE_HEIGHT_MULTIPLIER,
+            color: editingTextShape.fill || "#0f172a",
+            background: "transparent",
+            border: "none",
+            outline: "none",
+            resize: "none",
+            whiteSpace: "pre",
+            overflow: "hidden",
+            padding: "0px",
+            margin: 0,
+            zIndex: 20,
+          }}
+        />
+      )}
 
       {/* Canvas */}
       <canvas ref={canvasRef} className="fixed inset-0" />

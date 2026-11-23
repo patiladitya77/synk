@@ -1,106 +1,94 @@
-import { findNearestPort } from "../Router";
+import { findNearestPort, Point } from "../arrowPorts";
 import { Shape } from "../types";
 import { ArrowShape } from "../types/ArrowShape";
 
-let _startX = 0;
-let _startY = 0;
-let _fromShapeId: string | undefined;
-let _fromPort: "n" | "s" | "e" | "w" | undefined;
+export type ArrowDraft = {
+  start: Point;
+  fromShapeId?: string;
+  fromPort?: "n" | "s" | "e" | "w";
+};
 
-/**
- * Call this on mousedown to begin drawing an arrow.
- * Returns the start anchor info (may be snapped to a shape port).
- */
-export function arrowToolMouseDown(
+
+// Creates an arrow draft on mousedown.
+export function createArrowDraft(
   x: number,
   y: number,
   shapes: Shape[],
-): void {
+): ArrowDraft {
   const snap = findNearestPort(x, y, shapes);
   if (snap) {
-    _startX = snap.point.x;
-    _startY = snap.point.y;
-    _fromShapeId = snap.shapeId;
-    _fromPort = snap.port;
-  } else {
-    _startX = x;
-    _startY = y;
-    _fromShapeId = undefined;
-    _fromPort = undefined;
+    return {
+      start: snap.point,
+      fromShapeId: snap.shapeId,
+      fromPort: snap.port,
+    };
   }
+  return {
+    start: { x, y },
+  };
 }
 
-/**
- * Call this on mousemove to get a live preview arrow (not yet committed).
- * Pass the current cursor world position.
- */
-export function arrowToolGetPreview(
+
+//Returns a live preview arrow from an active draft and current cursor position.
+
+export function getArrowPreview(
+  draft: ArrowDraft,
   x: number,
   y: number,
   shapes: Shape[],
 ): ArrowShape {
-  // Snap end to port if close enough
   const snap = findNearestPort(
     x,
     y,
     shapes,
     30,
-    _fromShapeId ? [_fromShapeId] : [],
+    draft.fromShapeId ? [draft.fromShapeId] : [],
   );
 
-  const preview: ArrowShape = {
+  return {
     id: "__preview__",
     type: "arrow",
-    x1: _startX,
-    y1: _startY,
+    x1: draft.start.x,
+    y1: draft.start.y,
     x2: snap ? snap.point.x : x,
     y2: snap ? snap.point.y : y,
-    fromShapeId: _fromShapeId,
-    fromPort: _fromPort,
+    fromShapeId: draft.fromShapeId,
+    fromPort: draft.fromPort,
     toShapeId: snap?.shapeId,
     toPort: snap?.port,
   };
-
-  return preview;
 }
 
-/**
- * Call this on mouseup to finalise the arrow shape.
- * Returns the committed ArrowShape ready to pass to AddShapeCommand.
- */
-export function arrowToolMouseUp(
+
+//Finalises and returns the created ArrowShape on mouseup.
+
+export function createArrow(
+  draft: ArrowDraft,
   x: number,
   y: number,
   shapes: Shape[],
   generateId: () => string,
 ): ArrowShape | null {
-  // Don't create a zero-length arrow
-  if (Math.hypot(x - _startX, y - _startY) < 5) return null;
+  if (Math.hypot(x - draft.start.x, y - draft.start.y) < 5) return null;
 
   const snap = findNearestPort(
     x,
     y,
     shapes,
     30,
-    _fromShapeId ? [_fromShapeId] : [],
+    draft.fromShapeId ? [draft.fromShapeId] : [],
   );
 
-  const arrow: ArrowShape = {
+  return {
     id: generateId(),
     type: "arrow",
-    x1: _startX,
-    y1: _startY,
+    x1: draft.start.x,
+    y1: draft.start.y,
     x2: snap ? snap.point.x : x,
     y2: snap ? snap.point.y : y,
-    fromShapeId: _fromShapeId,
-    fromPort: _fromPort,
+    fromShapeId: draft.fromShapeId,
+    fromPort: draft.fromPort,
     toShapeId: snap?.shapeId,
     toPort: snap?.port,
   };
-
-  // Reset state
-  _fromShapeId = undefined;
-  _fromPort = undefined;
-
-  return arrow;
 }
